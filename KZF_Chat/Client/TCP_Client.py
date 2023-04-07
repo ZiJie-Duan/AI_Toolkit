@@ -1,5 +1,6 @@
 import socket
 import json
+import ssl
 
 class TCPClient:
     """
@@ -7,9 +8,9 @@ class TCPClient:
     all the data will be packed into a dict
     """
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
-        self.server_address = server_address
+        self.host, self.port = server_address
         self.buffer_size = buffer_size
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket = None
 
     def recv_all(self, sock: object, data_len: bytes) -> bytes:
         data = b''
@@ -29,7 +30,16 @@ class TCPClient:
         return json.loads(data.decode('utf-8'))
 
     def start(self, data_dict: dict):
-        self.client_socket.connect(self.server_address)
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+         # 创建 SSL/TLS 上下文
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
+        # 将套接字包装为 SSL/TLS 套接字
+        self.client_socket = context.wrap_socket(client_socket)
+
+        self.client_socket.connect((self.host, self.port))
 
         try:
             data_len, data = self.pack_data(data_dict)
