@@ -38,10 +38,14 @@ class TCPServer:
         while True:
             print('等待客户端连接...')
             connection, client_address = self.server_socket.accept()
-            # 将套接字包装为 SSL/TLS 套接字
-            secure_sock = context.wrap_socket(connection, server_side=True)
-            threading.Thread(target=self.handle, args=(secure_sock, client_address)).start()
-            
+            try:
+                # 将套接字包装为 SSL/TLS 套接字
+                secure_sock = context.wrap_socket(connection, server_side=True)
+                threading.Thread(target=self.handle, args=(secure_sock, client_address)).start()
+            except ssl.SSLError as e:
+                print(f'SSL 错误: {e}')
+                connection.close()
+
     def handle(self, connection, client_address):
         try:
             print('连接来自:', client_address)
@@ -52,7 +56,7 @@ class TCPServer:
             # 接收数据
             data = self.recv_all(connection, data_len)
             received_dict = self.unpack_data(data)
-            print('接收到的字典:', received_dict)
+            print('用户提问:', received_dict['storyboard'][-1])
 
             # 处理数据
             reply_dict = self.data_process(received_dict)

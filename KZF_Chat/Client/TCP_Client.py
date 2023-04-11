@@ -10,7 +10,6 @@ class TCPClient:
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
         self.host, self.port = server_address
         self.buffer_size = buffer_size
-        self.client_socket = None
 
     def recv_all(self, sock: object, data_len: bytes) -> bytes:
         data = b''
@@ -37,29 +36,29 @@ class TCPClient:
         context.verify_mode = ssl.CERT_NONE
 
         # 将套接字包装为 SSL/TLS 套接字
-        self.client_socket = context.wrap_socket(client_socket)
+        security_client_socket = context.wrap_socket(client_socket)
 
-        self.client_socket.connect((self.host, self.port))
+        security_client_socket.connect((self.host, self.port))
 
         try:
             data_len, data = self.pack_data(data_dict)
 
             # send the length of data to remind the server
-            self.client_socket.sendall(data_len)
-            _reply = self.client_socket.recv(self.buffer_size)
+            security_client_socket.sendall(data_len)
+            _reply = security_client_socket.recv(self.buffer_size)
 
             # send the data
-            self.client_socket.sendall(data)
+            security_client_socket.sendall(data)
             # reveive the length of reply
-            reply_len = self.client_socket.recv(self.buffer_size)
+            reply_len = security_client_socket.recv(self.buffer_size)
 
-            self.client_socket.sendall(b'ok')
+            security_client_socket.sendall(b'ok')
             # receive the reply
-            reply_data = self.recv_all(self.client_socket, reply_len)
+            reply_data = self.recv_all(security_client_socket, reply_len)
             
             reply_dict = self.unpack_data(reply_data)
         finally:
-            self.client_socket.close()
+            security_client_socket.close()
         
         return reply_dict
 

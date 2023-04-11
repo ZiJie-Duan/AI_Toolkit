@@ -18,10 +18,10 @@ class Memo:
             json.dump(dialogue_history, file, indent=2)
 
 class StoryBoard:
-    def __init__(self, memo: Memo, back_ground: str):
+    def __init__(self, memo: Memo, back_ground: list[Dict]):
         self.memo = memo
         self.dialogue_history = self.memo.read_from_file()
-        self.back_ground_check(back_ground=back_ground)
+        self.back_ground_insert(back_ground=back_ground["助手"])
 
     def add_dialogue_entry(self, user_input: str, ai_response: str):
         self.dialogue_history.append(
@@ -35,13 +35,11 @@ class StoryBoard:
     def get_dialogue_history(self) -> List[Dict[str, str]]:
         return self.dialogue_history[:]
 
-    def back_ground_check(self,back_ground):
+    def back_ground_insert(self,back_ground: list[Dict]) -> None: 
         if self.dialogue_history == []:
-            self.dialogue_history.append(
-                {"role": "system", "content": back_ground},
-            )
-
-
+            print(back_ground)
+            self.dialogue_history = back_ground[:]
+            
 
 # # 创建一个Memo对象，设置文件名为"dialogue_history.json"
 # memo = Memo("dialogue_history.json")

@@ -7,6 +7,7 @@ class CHAT_GUI(tk.Tk):
         super().__init__()
         self.title("康中福 ChatGPT-3.5-turbo")
         self.geometry("800x600")
+        self.iconbitmap('logo.ico')  # 使用自定义图标
         self.create_widgets()
 
         self.settings_callback = None
@@ -32,7 +33,7 @@ class CHAT_GUI(tk.Tk):
         self.max_tokens_label.pack(side=tk.TOP, pady=10)
         self.max_tokens_entry = ttk.Entry(self.left_frame)
         self.max_tokens_entry.pack(side=tk.TOP)
-        self.max_tokens_entry.insert(0, "100")  # 设置 temperature 默认值
+        self.max_tokens_entry.insert(0, "300")  # 设置 temperature 默认值
 
         # 添加情景选择下拉框及其标签
         self.scenario_label = ttk.Label(self.left_frame, text="情景选择:")
@@ -42,12 +43,16 @@ class CHAT_GUI(tk.Tk):
         self.scenario_combobox.pack(side=tk.TOP)
 
         # 在左侧框架中添加设置
-        self.setting_button = ttk.Button(self.left_frame, text="设置", command=self.settings)
-        self.setting_button.pack(side=tk.TOP, pady=10)
+        self.setting_button = ttk.Button(self.left_frame, text="应用设置", command=self.settings)
+        self.setting_button.pack(side=tk.TOP, pady=20)
 
         # 在左侧框架中添加
         self.setting_button = ttk.Button(self.left_frame, text="刷新", command=self.refresh_dialogue)
         self.setting_button.pack(side=tk.TOP, pady=10)
+
+        # 添加对话计数器标签
+        self.dialogue_counter_lable = ttk.Label(self.left_frame, text="建议对话次数 剩余：")
+        self.dialogue_counter_lable.pack(side=tk.TOP, pady=10)
 
         # 在左侧框架中添加重启对话按钮
         self.setting_button = ttk.Button(self.left_frame, text="重启对话", command=self.restart_dialogue)
@@ -86,9 +91,11 @@ class CHAT_GUI(tk.Tk):
         if message:
             self.message_entry.delete("1.0", tk.END)  # 清空多行文本框的内容
             self.send_message_callback(message)
+            self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
 
     def insert_message(self, message: str) -> None:
         self.dialogue_text.insert(tk.END, message + "\n\n")
+        self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
     
     def refresh_dialogue(self) -> None:
         self.refresh_dialogue_callback()
@@ -98,6 +105,10 @@ class CHAT_GUI(tk.Tk):
     
     def clear_dialogue(self) -> None:
         self.dialogue_text.delete("1.0", tk.END)
+
+    def update_dialogue_counter_text(self, new_text: str, color: str = "black"):
+        self.dialogue_counter_lable.config(text=new_text,foreground=color)
+
 
 # # 运行程序
 # if __name__ == "__main__":
