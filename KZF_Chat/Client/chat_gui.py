@@ -38,7 +38,7 @@ class CHAT_GUI(tk.Tk):
         # 添加情景选择下拉框及其标签
         self.scenario_label = ttk.Label(self.left_frame, text="情景选择:")
         self.scenario_label.pack(side=tk.TOP, pady=10)
-        self.scenario_combobox = ttk.Combobox(self.left_frame, values=["助手", "翻译器"])
+        self.scenario_combobox = ttk.Combobox(self.left_frame, values=["助手", "翻译器", "猫娘"])
         self.scenario_combobox.current(0)
         self.scenario_combobox.pack(side=tk.TOP)
 

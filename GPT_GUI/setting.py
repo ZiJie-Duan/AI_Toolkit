@@ -2,16 +2,20 @@
 class SETTING:
 
     def __init__(self) -> None:
+        self.system_mode = "local" # local or server
+
         self.memo_file = "memo.json"
+        self.GPT_mode = "gpt-4"
+        self.GPT_api_key = "sk-"
 
         self.temperature = 0.5
         self.max_tokens = 100
         self.scenario = "助手"
         self.record = True # used to record the dialogue history
 
-        self.host = "47.74.85.241"
+        self.host = ""
         self.port = 12345
-        self.kzf_key = "KZF_KEY_FIRST_VERSION"
+        self.kzf_key = ""
 
         self.max_dialogue = 10
 
@@ -21,8 +25,8 @@ class SETTING:
         self.back_ground = {
             "助手": [{"role": "system",
                     "content": """you are a helpful assistant."""}],
-            "医疗助手": [{"role": "system",
-                    "content": """you are a medical assistant."""}],
+            "老师": [{"role": "system",
+                    "content": """you are a teacher."""}],
             "猫娘": [
   {
     "role": "system",

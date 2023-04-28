@@ -1,4 +1,5 @@
 from TCP_Client import TCPClient
+from GPT_API import GPT_API
 from StoryBoard import Memo, StoryBoard
 from setting import SETTING
 from chat_gui import CHAT_GUI
@@ -8,11 +9,14 @@ class CHAT_CORE:
 
     def __init__(self):
         self.set = SETTING()
-        self.tcp_client = TCPClient(server_address=(self.set.host, self.set.port))
+        self.tcp_client = TCPClient((self.set.host, self.set.port))
+        self.gpt_api = GPT_API(self.set.GPT_api_key)
+        self.gpt_api.set_model(self.set.GPT_mode)
         self.memo = Memo(self.set.memo_file)
         self.storyboard = StoryBoard(self.memo, self.set.back_ground)
         self.chat_gui = CHAT_GUI()
         self.dialogue_record = True
+        self.system_mode = self.set.system_mode
     
     def set_chat_gui(self):
         """
@@ -98,8 +102,27 @@ class CHAT_CORE:
         send message to the GPT-3 API and get the response
         """
         self.chat_gui.insert_message("用户: " + message)
-        task = threading.Thread(target=self.get_server_reply,args=(message,))
-        task.start()
+        if self.system_mode == "local":
+            task = threading.Thread(target=self.get_GPT_reply,args=(message,))
+            task.start()
+        else:
+            task = threading.Thread(target=self.get_server_reply,args=(message,))
+            task.start()
+    
+    def get_GPT_reply(self, message: str) -> str:
+        messages = self.storyboard.get_dialogue_history()
+        messages.append({"role": "user", "content": message})
+        
+        reply = self.gpt_api.query(
+                            messages, 
+                            self.set.temperature,
+                            self.set.max_tokens)
+
+        if self.dialogue_record:   
+            self.storyboard.add_dialogue_entry(message,reply)
+            self.update_dialogue_counter()
+        self.chat_gui.insert_message("助手: " + reply)
+
 
     def get_server_reply(self, message: str) -> str:
         messages = self.storyboard.get_dialogue_history()
@@ -131,7 +154,7 @@ class CHAT_CORE:
         self.chat_gui.insert_message("[{}]: {}".format(type, info))
 
     def help(self):
-        self.print_info("欢迎使用 康中福ChatGPT3.5 代理系统v1.2", "系统")
+        self.print_info("欢迎使用 GPT_GUI_v2.0", "系统")
         self.print_info("请遵循OpenAI使用条例", "系统")
         self.print_info(
         """
@@ -163,8 +186,11 @@ def main():
         chat_core.help()
         chat_core.chat_gui.mainloop()
     except Exception as e:
-        chat_core.print_info("错误信息: " + str(e), "系统错误")
-        chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
+        try:
+            chat_core.print_info("错误信息: " + str(e), "系统错误")
+            chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
+        except:
+            pass
         print(e)
         print("程序出现错误, 请联系开发者")
     return 0

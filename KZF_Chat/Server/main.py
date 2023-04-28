@@ -16,6 +16,9 @@ class GPT3Server:
         if data["key"] != self.set.kzf_key:
             return {"info": "key_error",
                     "reply": "None"}
+        elif int(data["max_tokens"]) > 2000:
+            return {"info": "success",
+                    "reply": "max_tokens不能超过2000"}
         else:
             reply = self.gpt_api.query(data["storyboard"],
                                        float(data["temperature"]),
@@ -24,18 +27,14 @@ class GPT3Server:
                     "reply": reply}
 
     def start(self):
-        self.TCP_server.start(5)
+        self.TCP_server.start()
     
 
 def main():
+    gpt3_server = GPT3Server()
+
     while True:
-        try:
-            gpt3_server = GPT3Server()
-            gpt3_server.start()
-        except Exception as e:
-            print(f'主进程异常: {e}')
-            time.sleep(5)
-            print('重新启动服务器...')
+        gpt3_server.start()
 
 if __name__ == '__main__':
     main()

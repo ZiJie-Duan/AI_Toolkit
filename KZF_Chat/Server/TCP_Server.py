@@ -9,7 +9,15 @@ class TCPServer:
         self.buffer_size = buffer_size
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_process = None
-        
+
+        self.server_socket.bind(self.server_address)
+        self.server_socket.listen(5)
+
+         # 加载证书和私钥
+        self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        self.context.load_cert_chain(certfile='server.crt', keyfile='server.key')
+
+
     def recv_all(self, sock: object, data_len: bytes) -> bytes:
         data = b''
         remaining = int(data_len.decode('utf-8'))
@@ -27,27 +35,27 @@ class TCPServer:
     def unpack_data(self, data: bytes) -> dict:
         return json.loads(data.decode('utf-8'))
 
-    def start(self, lisent=5):
-        self.server_socket.bind(self.server_address)
-        self.server_socket.listen(lisent)
-
-         # 加载证书和私钥
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        context.load_cert_chain(certfile='server.crt', keyfile='server.key')
+    def start(self):
 
         while True:
             print('等待客户端连接...')
-            connection, client_address = self.server_socket.accept()
+            orig_connection, client_address = self.server_socket.accept()
             try:
-                # 将套接字包装为 SSL/TLS 套接字
-                secure_sock = context.wrap_socket(connection, server_side=True)
-                threading.Thread(target=self.handle, args=(secure_sock, client_address)).start()
+                new_thread = threading.Thread(target=self.handle, args=(orig_connection, client_address))
+                new_thread.start()
             except ssl.SSLError as e:
                 print(f'SSL 错误: {e}')
-                connection.close()
+                orig_connection.close()
+            except socket.timeout as e:
+                print(f"握手超时: {e}")
+                orig_connection.close()
 
-    def handle(self, connection, client_address):
+
+    def handle(self, orig_connection, client_address):
+        connection = None
         try:
+            connection = self.context.wrap_socket(orig_connection, server_side=True)
+
             print('连接来自:', client_address)
             # 接收数据长度
             data_len = connection.recv(self.buffer_size)
@@ -71,10 +79,11 @@ class TCPServer:
             connection.sendall(reply_data)
 
         except Exception as e:
-            print(f'异常: {e}')
+            print(f'异常 来自handle函数: {e}')
 
         finally:
-            connection.close()
+            if connection:
+                connection.close()
 
 # if __name__ == '__main__':
 #     data_processor = DataProcessor()

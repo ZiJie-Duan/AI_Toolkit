@@ -3,7 +3,7 @@ import openai
 class GPT_API:
     def __init__(self, api_key: str):
         openai.api_key = api_key
-        self.model = "gpt-3.5-turbo"  # 设置默认模型
+        self.model = "gpt-4"  # 设置默认模型
 
     def set_model(self, model: str):
         self.model = model
@@ -15,6 +15,7 @@ class GPT_API:
             temperature = temperature,
             max_tokens = max_tokens
         )
+        print(response)
         return response.choices[0].message.content
 
 
