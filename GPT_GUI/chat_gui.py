@@ -3,16 +3,38 @@ from tkinter import ttk
 
 # 创建主窗口
 class CHAT_GUI(tk.Tk):
-    def __init__(self):
+    def __init__(self,
+                title="UI_GPT",
+                geometry="800x600",
+                selected_scenario = None,
+                selected_model = None,
+                scenario = [],
+                models = [],
+                temperature = "0.5",
+                max_tokens = "300",
+                settings_callback=None,
+                send_message_callback=None,
+                refresh_dialogue_callback=None,
+                restart_dialogue_callback=None
+                ):
+        
         super().__init__()
-        self.title("GPT_GUI_2.0")
-        self.geometry("800x600")
-        self.create_widgets()
+        self.title(title)
+        self.geometry(geometry)
 
-        self.settings_callback = None
-        self.send_message_callback = None
-        self.refresh_dialogue_callback = None
-        self.restart_dialogue_callback = None
+        self.selected_model = selected_model
+        self.selected_scenario = selected_scenario
+        self.models = models
+        self.scenario = scenario
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+        self.settings_callback = settings_callback
+        self.send_message_callback = send_message_callback
+        self.refresh_dialogue_callback = refresh_dialogue_callback
+        self.restart_dialogue_callback = restart_dialogue_callback
+
+        self.create_widgets()
 
     # 创建并放置组件
     def create_widgets(self):
@@ -20,25 +42,32 @@ class CHAT_GUI(tk.Tk):
         self.left_frame = ttk.Frame(self)
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 
+        # 在此处添加模型选择下拉框及其标签
+        self.model_label = ttk.Label(self.left_frame, text="选择模型:")
+        self.model_label.pack(side=tk.TOP, pady=10)
+        self.model_combobox = ttk.Combobox(self.left_frame, values=self.models)
+        self.model_combobox.set(self.selected_model)
+        self.model_combobox.pack(side=tk.TOP)
+
         # 添加Temperature标签和输入框
         self.temperature_label = ttk.Label(self.left_frame, text="Temperature:")
         self.temperature_label.pack(side=tk.TOP, pady=10)
         self.temperature_entry = ttk.Entry(self.left_frame)
         self.temperature_entry.pack(side=tk.TOP)
-        self.temperature_entry.insert(0, "0.5")  # 设置 temperature 默认值
+        self.temperature_entry.insert(0, self.temperature)  # 设置 temperature 默认值
 
         # 添加Max Tokens标签和输入框
         self.max_tokens_label = ttk.Label(self.left_frame, text="Max Tokens:")
         self.max_tokens_label.pack(side=tk.TOP, pady=10)
         self.max_tokens_entry = ttk.Entry(self.left_frame)
         self.max_tokens_entry.pack(side=tk.TOP)
-        self.max_tokens_entry.insert(0, "300")  # 设置 temperature 默认值
+        self.max_tokens_entry.insert(0, self.max_tokens)  # 设置 temperature 默认值
 
         # 添加情景选择下拉框及其标签
         self.scenario_label = ttk.Label(self.left_frame, text="情景选择:")
         self.scenario_label.pack(side=tk.TOP, pady=10)
-        self.scenario_combobox = ttk.Combobox(self.left_frame, values=["助手", "老师", "猫娘"])
-        self.scenario_combobox.current(0)
+        self.scenario_combobox = ttk.Combobox(self.left_frame, values=self.scenario)
+        self.scenario_combobox.set(self.selected_scenario)
         self.scenario_combobox.pack(side=tk.TOP)
 
         # 在左侧框架中添加设置
@@ -74,12 +103,16 @@ class CHAT_GUI(tk.Tk):
 
     # 设置功能函数
     def settings(self) -> None:
+        model = self.model_combobox.get()
         temperature = self.temperature_entry.get()
         max_tokens = self.max_tokens_entry.get()
         scenario = self.scenario_combobox.get()
 
         if self.settings_callback:
-            self.settings_callback(float(temperature), int(max_tokens), scenario)
+            self.settings_callback( str(model),
+                                    float(temperature), 
+                                    int(max_tokens),
+                                    scenario)
     
     def handle_return(self, event):
         self.send_message()

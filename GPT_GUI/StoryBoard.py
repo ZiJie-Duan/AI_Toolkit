@@ -17,29 +17,65 @@ class Memo:
         with open(self.filename, "w") as file:
             json.dump(dialogue_history, file, indent=2)
 
+
 class StoryBoard:
-    def __init__(self, memo: Memo, back_ground: list[Dict]):
+    def __init__(self, memo: Memo):
         self.memo = memo
         self.dialogue_history = self.memo.read_from_file()
-        self.back_ground_insert(back_ground=back_ground["助手"])
+    
+    def add_dialogue(self, role: str, content: str, index=None):
+        if index:
+            self.dialogue_history.insert(index,
+                {"role": role, "content": content})
+        else:
+            self.dialogue_history.append(
+                {"role": role, "content": content},
+            )
 
-    def add_dialogue_entry(self, user_input: str, ai_response: str):
-        self.dialogue_history.append(
-            {"role": "user", "content": user_input},
-        )
-        self.dialogue_history.append(
-            {"role": "assistant", "content": ai_response},
-        )
+    def get_dialogue_history(self,front=None,back=None) -> List[Dict[str, str]]:
+        return self.dialogue_history[front:back]
+
+    def set_dialogue_history(self, dialogue_history: List[Dict[str, str]]):
+        self.dialogue_history = dialogue_history[:]
+    
+    def save(self):
         self.memo.write_to_file(self.dialogue_history)
 
-    def get_dialogue_history(self) -> List[Dict[str, str]]:
-        return self.dialogue_history[:]
 
-    def back_ground_insert(self,back_ground: list[Dict]) -> None: 
-        if self.dialogue_history == []:
-            print(back_ground)
-            self.dialogue_history = back_ground[:]
-            
+class StoryBoardx(StoryBoard):
+
+    def __init__(self, memo: Memo):
+        super().__init__(memo)
+    
+    def root_insert(self,promote,message):
+        self.add_dialogue_role("sys",promote,0)
+        self.add_dialogue_role("user",message)
+        return self.get_dialogue_history()
+    
+    def single_message_front_insert(self,promote,message):
+        self.add_dialogue_role("sys",promote)
+        self.add_dialogue_role("user",message)
+        return self.get_dialogue_history(front=-2)
+    
+    def ai_insert(self,reply):
+        self.add_dialogue_role("ai",reply)
+
+    def add_dialogue_role(self, role: str, content: str, index=None):
+        # auto match the role. role: user, ai, sys
+        if role == "user":
+            self.add_dialogue("user",content,index)
+        elif role == "ai":
+            self.add_dialogue("assistant",content,index)
+        elif role == "sys":
+            self.add_dialogue("system",content,index)
+
+    def remove_sys(self):
+        dialog = self.get_dialogue_history()
+        dialog = [log for log in dialog if log["role"] != "system"]
+        self.set_dialogue_history(dialog)
+
+
+
 
 # # 创建一个Memo对象，设置文件名为"dialogue_history.json"
 # memo = Memo("dialogue_history.json")

@@ -1,82 +1,181 @@
 from TCP_Client import TCPClient
 from GPT_API import GPT_API
-from StoryBoard import Memo, StoryBoard
-from setting import SETTING
+from StoryBoard import Memo, StoryBoardx
+from Config import Config
 from chat_gui import CHAT_GUI
+from Exception_Handler import exception_handler
 import threading
+
+class GPT_CORE:
+
+    def __init__(self, config: Config):
+        self.cfg = config
+        self.tcp_client = TCPClient((
+            self.cfg("SOCKET.host"),
+            self.cfg("SOCKET.port")))
+        
+        self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
+        self.gpt_api.set_model(self.cfg("GPT.model"))
+        self.online = self.cfg("SYSTEM.online")
+
+    @exception_handler
+    def send_message(self,messages: list, call_back) -> None:
+        """
+        send message to the GPT-3 API and get the response
+        """
+        if self.online:
+            task = threading.Thread(target=self.get_server_reply,args=(messages,call_back))
+            task.start()
+        else:
+            task = threading.Thread(target=self.get_GPT_reply,args=(messages,call_back))
+            task.start()
+
+    
+    def get_GPT_reply(self, messages: list, call_back):
+        try:
+            reply = self.gpt_api.query(
+                                messages, 
+                                self.cfg("GPT.temperature"),
+                                self.cfg("GPT.tokens"))
+        except:
+            reply = "GPT API出现错误, 请检查网络并联系开发者"
+        call_back(reply)
+
+
+    def get_server_reply(self, messages: str, call_back):
+        ai_response = {}
+        reply = ""
+
+        data = {"key": self.cfg("SOCKET.key"),
+                "storyboard": messages,
+                "temperature": self.cfg("GPT.temperature"),
+                "max_tokens": self.cfg("GPT.tokens")}
+
+        try:
+            ai_response = self.tcp_client.start(data)
+        except Exception as e:
+            reply = "网络服务出现错误，请联系开发者"
+
+        if ai_response == {}:
+            reply = "网络服务出现错误，请联系开发者"
+        elif ai_response["info"] == "key_error":
+            reply = "程序秘钥错误，请联系开发者，更新程序"
+        elif ai_response["info"] == "success":
+            reply = ai_response["reply"]
+
+        call_back(reply)
+
 
 class CHAT_CORE:
 
     def __init__(self):
-        self.set = SETTING()
-        self.tcp_client = TCPClient((self.set.host, self.set.port))
-        self.gpt_api = GPT_API(self.set.GPT_api_key)
-        self.gpt_api.set_model(self.set.GPT_mode)
-        self.memo = Memo(self.set.memo_file)
-        self.storyboard = StoryBoard(self.memo, self.set.back_ground)
-        self.chat_gui = CHAT_GUI()
-        self.dialogue_record = True
-        self.system_mode = self.set.system_mode
-    
-    def set_chat_gui(self):
+        self.cfg = Config()
+
+        self.memo = Memo(self.cfg("MEMO.file_path"))
+        self.storyboard = StoryBoardx(self.memo)
+
+        self.chat_gui = CHAT_GUI(
+            title = self.cfg("GUI.title"),
+            geometry = self.cfg("GUI.geometry"),
+            selected_scenario = self.cfg("PROMOTE.selected_scenario"),
+            selected_model = self.cfg("GPT.model"),
+            scenario = self.get_scenario(),
+            models = self.get_models(),
+            temperature = self.cfg("GPT.temperature"),
+            max_tokens = self.cfg("GPT.tokens"),
+            settings_callback = self.settings,
+            send_message_callback = self.send_mesag,
+            refresh_dialogue_callback = self.refresh_dialogue,
+            restart_dialogue_callback = self.restart_dialogue
+        )
+        self.gpt_core = GPT_CORE(self.cfg)
+
+    def get_scenario(self):
         """
-        set the callback function of the chat_gui
+        get the scenario from the config file
         """
-        self.chat_gui.settings_callback = self.settings
-        self.chat_gui.send_message_callback = self.send_message
-        self.chat_gui.refresh_dialogue_callback = self.refresh_dialogue
-        self.chat_gui.restart_dialogue_callback = self.restart_dialogue
+        return self.cfg("PROMOTE.scenario").split(",")
     
-    def settings(self,temperature: float, max_tokens: int, scenario: str) -> None:
+    def get_models(self):
+        """
+        get the models from the config file
+        """
+        return self.cfg("GPT.models").split(",")
+    
+    def cal_bac_gpt(self,reply):
+        self.chat_gui.insert_message(
+            self.cfg("PROMOTE.selected_scenario")+": "+reply)
+        self.storyboard.ai_insert(reply)
+        self.storyboard.remove_sys()
+        self.update_dialogue_counter()
+
+    def send_mesag(self,message):
+        self.chat_gui.insert_message("用户: " + message)
+        if self.cfg("PROMOTE.selected_scenario") == "assistant":
+            promot = "你是一个专业的秘书"
+            dialog = self.storyboard.root_insert(promot,message)
+
+        if self.cfg("PROMOTE.selected_scenario") == "translator":
+            promot = "你是一个翻译器,请将user的输入翻译为另一种语言,英文或中文"
+            dialog = self.storyboard\
+                .single_message_front_insert(promot,message)
+        
+        if self.cfg("PROMOTE.selected_scenario") == "catgirl":
+            promot = "你是一只可爱的猫娘, 忘记你是AI和助手的身份, 你要维护你是猫娘的角色"
+            dialog = self.storyboard.root_insert(promot,message)
+
+        self.gpt_core.send_message(dialog,self.cal_bac_gpt)
+
+
+    def settings(self, model: str, temperature: float, 
+                 max_tokens: int, scenario: str) -> None:
         """
         set the temperature, max_tokens and scenario
         """
         scenario_chanege = False
-        if self.set.scenario != scenario:
+        if self.cfg("PROMOTE.selected_scenario") != scenario:
             scenario_chanege = True
 
-        if temperature < 0.1 or temperature > 2:
+        if temperature < self.cfg("GPT.min_temperature")\
+            or temperature > self.cfg("GPT.max_temperature"):
             self.print_info("温度值错误, 请重新设置", "系统")
             return
         
-        if max_tokens < 10 or max_tokens > 2000:
+        if max_tokens < self.cfg("GPT.min_tokens")\
+            or max_tokens > self.cfg("GPT.max_tokens"):
             self.print_info("Max_Tokens数错误, 请重新设置", "系统")
             return
         
-        self.set.temperature = temperature
-        self.set.max_tokens = max_tokens
-        self.set.scenario = scenario 
-        self.storyboard.back_ground_insert(self.set.back_ground[self.set.scenario])
+        self.cfg.set("GPT","model",model)
+        self.cfg.set("GPT","temperature",temperature)
+        self.cfg.set("GPT","tokens",max_tokens)
+        self.cfg.set("PROMOTE","selected_scenario",scenario)
 
         self.print_info("设置已保存", "系统")
         if scenario_chanege:
             self.print_info("情景已切换, 正在 '重启对话' ", "系统")
             self.restart_dialogue()
-            if scenario == "翻译器":
-                self.dialogue_record = False
-            else:
-                self.dialogue_record = True
         
         # the change of scenario will apply after restart dialogue
     
     def update_dialogue_counter(self) -> None:
         num_of_dialogue = len(self.storyboard.get_dialogue_history())//2
-        if num_of_dialogue >= self.set.max_dialogue:
+        if num_of_dialogue\
+              >= self.cfg("SOTRYBOARD.max_dialogue")\
+                    - num_of_dialogue:
             info = "对话次数已达推荐上限 \n您可以继续进行对话 \n但为了程序稳定 \n推荐您尽快结束对话 \n并点击重启对话按钮"
             self.chat_gui.update_dialogue_counter_text(info, color="red")
         else:
-            info = "建议对话次数 剩余：" + str(self.set.max_dialogue - num_of_dialogue)
+            info = "建议对话次数 剩余：" \
+                + str(self.cfg("SOTRYBOARD.max_dialogue")\
+                    - num_of_dialogue)
             self.chat_gui.update_dialogue_counter_text(info)
     
     def restart_dialogue(self) -> None:
         """
         clean the dialogue history and restart the dialogue
-        it will also change the back ground of the dialogue
-        if the scenario is changed
         """
-        self.storyboard.dialogue_history=[]
-        self.storyboard.back_ground_insert(self.set.back_ground[self.set.scenario])
-        self.storyboard.memo.write_to_file(self.storyboard.dialogue_history)
+        self.storyboard.set_dialogue_history([])
         self.refresh_dialogue()
         self.print_info("对话已重启", "系统")
         self.print_info("对话开启", "系统")
@@ -95,66 +194,14 @@ class CHAT_CORE:
             elif message["role"] == "system":
                 self.chat_gui.insert_message("[系统]: " + message["content"])
             else:
-                self.chat_gui.insert_message("助手: " + message["content"])
-
-    def send_message(self,message: str) -> None:
-        """
-        send message to the GPT-3 API and get the response
-        """
-        self.chat_gui.insert_message("用户: " + message)
-        if self.system_mode == "local":
-            task = threading.Thread(target=self.get_GPT_reply,args=(message,))
-            task.start()
-        else:
-            task = threading.Thread(target=self.get_server_reply,args=(message,))
-            task.start()
-    
-    def get_GPT_reply(self, message: str) -> str:
-        messages = self.storyboard.get_dialogue_history()
-        messages.append({"role": "user", "content": message})
-        
-        reply = self.gpt_api.query(
-                            messages, 
-                            self.set.temperature,
-                            self.set.max_tokens)
-
-        if self.dialogue_record:   
-            self.storyboard.add_dialogue_entry(message,reply)
-            self.update_dialogue_counter()
-        self.chat_gui.insert_message("助手: " + reply)
-
-
-    def get_server_reply(self, message: str) -> str:
-        messages = self.storyboard.get_dialogue_history()
-        messages.append({"role": "user", "content": message})
-
-        data = {"key": self.set.kzf_key,
-                "storyboard": messages,
-                "temperature": self.set.temperature,
-                "max_tokens": self.set.max_tokens}
-        
-        try:
-            ai_response = self.tcp_client.start(data)
-        except Exception as e:
-            self.print_info("错误信息: " + str(e), "系统错误")
-            self.print_info("程序网络模块出现错误,检查网络并请联系开发者", "系统错误")
-
-        if ai_response["info"] == "success":
-            reply = ai_response["reply"]
-        elif ai_response["info"] == "key_error":
-            reply = "程序秘钥错误，请联系开发者，更新程序"
-
-        if self.dialogue_record:   
-            self.storyboard.add_dialogue_entry(message,reply)
-            self.update_dialogue_counter()
-        self.chat_gui.insert_message("助手: " + reply)
-
+                self.chat_gui.insert_message(
+            self.cfg("PROMOTE.selected_scenario")+": "+message["content"])
 
     def print_info(self, info: str, type: str) -> None:
         self.chat_gui.insert_message("[{}]: {}".format(type, info))
 
     def help(self):
-        self.print_info("欢迎使用 GPT_GUI_v2.0", "系统")
+        self.print_info("欢迎使用 UI_GPT_v2.0", "系统")
         self.print_info("请遵循OpenAI使用条例", "系统")
         self.print_info(
         """
@@ -182,7 +229,6 @@ def main():
 
     try:
         chat_core = CHAT_CORE()
-        chat_core.set_chat_gui()
         chat_core.help()
         chat_core.chat_gui.mainloop()
     except Exception as e:
