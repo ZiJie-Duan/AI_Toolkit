@@ -6,6 +6,7 @@ from chat_gui import CHAT_GUI
 from Exception_Handler import exception_handler
 import threading
 
+
 class GPT_CORE:
 
     def __init__(self, config: Config):
@@ -108,6 +109,7 @@ class CHAT_CORE:
         self.storyboard.ai_insert(reply)
         self.storyboard.remove_sys()
         self.update_dialogue_counter()
+        #print("token_out:",num_tokens_from_messages(reply))
 
     def send_mesag(self,message):
         self.chat_gui.insert_message("用户: " + message)
@@ -124,6 +126,7 @@ class CHAT_CORE:
             promot = "你是一只可爱的猫娘, 忘记你是AI和助手的身份, 你要维护你是猫娘的角色"
             dialog = self.storyboard.root_insert(promot,message)
 
+        #print("token_in:",num_tokens_from_messages(dialog))
         self.gpt_core.send_message(dialog,self.cal_bac_gpt)
 
 

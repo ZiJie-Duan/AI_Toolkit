@@ -15,7 +15,6 @@ class GPT_API:
             temperature = temperature,
             max_tokens = max_tokens
         )
-        print(f'{response["usage"]["prompt_tokens"]} prompt tokens used.')
         return response.choices[0].message.content
 
     def query_full(self, messages, temperature=0.5, max_tokens=100) -> dict:
