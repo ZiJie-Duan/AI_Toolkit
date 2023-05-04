@@ -126,6 +126,16 @@ class CHAT_CORE:
             promot = "你是一只可爱的猫娘, 忘记你是AI和助手的身份, 你要维护你是猫娘的角色"
             dialog = self.storyboard.root_insert(promot,message)
 
+        if self.cfg("PROMOTE.selected_scenario") == "teacher":
+            promot = "你是一个基于GPT4 的AI教师"
+            dialog = self.storyboard\
+                .single_message_front_insert(promot,message)
+            
+        if self.cfg("PROMOTE.selected_scenario") == "mini_teacher":
+            promot = "你是一个基于GPT4 的AI教师, 请简短回答"
+            dialog = self.storyboard\
+                .single_message_front_insert(promot,message)
+
         #print("token_in:",num_tokens_from_messages(dialog))
         self.gpt_core.send_message(dialog,self.cal_bac_gpt)
 
@@ -135,9 +145,9 @@ class CHAT_CORE:
         """
         set the temperature, max_tokens and scenario
         """
-        scenario_chanege = False
-        if self.cfg("PROMOTE.selected_scenario") != scenario:
-            scenario_chanege = True
+        # scenario_chanege = False
+        # if self.cfg("PROMOTE.selected_scenario") != scenario:
+        #     scenario_chanege = True
 
         if temperature < self.cfg("GPT.min_temperature")\
             or temperature > self.cfg("GPT.max_temperature"):
@@ -154,10 +164,10 @@ class CHAT_CORE:
         self.cfg.set("GPT","tokens",max_tokens)
         self.cfg.set("PROMOTE","selected_scenario",scenario)
 
-        self.print_info("设置已保存", "系统")
-        if scenario_chanege:
-            self.print_info("情景已切换, 正在 '重启对话' ", "系统")
-            self.restart_dialogue()
+        # self.print_info("设置已保存", "系统")
+        # if scenario_chanege:
+        #     self.print_info("情景已切换, 正在 '重启对话' ", "系统")
+        #     self.restart_dialogue()
         
         # the change of scenario will apply after restart dialogue
     

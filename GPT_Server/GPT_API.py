@@ -16,8 +16,8 @@ class GPT_API:
             max_tokens = max_tokens
         )
         return response.choices[0].message.content
-
-    def query_full(self, messages, temperature=0.5, max_tokens=100) -> dict:
+    
+    def query_full(self, messages, temperature=0.5, max_tokens=100) -> str:
         response = openai.ChatCompletion.create(
             model = self.model,
             messages = messages,
@@ -25,6 +25,18 @@ class GPT_API:
             max_tokens = max_tokens
         )
         return response
+
+    def query_stream(self, messages, temperature=0.5, max_tokens=100):
+        response = openai.ChatCompletion.create(
+            model = self.model,
+            messages = messages,
+            temperature = temperature,
+            max_tokens = max_tokens,
+            stream=True,
+        )
+
+        for chunk in response:
+            yield chunk
 
 
 # if __name__ == "__main__":

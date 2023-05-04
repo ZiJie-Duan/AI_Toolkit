@@ -3,6 +3,10 @@ from GPT_API import GPT_API
 from Config import Config
 from TCP_Server import TCPServer
 from Key_Manager import KeyManager
+from token_tool import TokenCounter
+import functools
+import click
+import time
 
 class GPT_Server:
     def __init__(self):
@@ -11,10 +15,12 @@ class GPT_Server:
         self.TCP_server = TCPServer((self.cfg("SOCKET.host"), 
                                      self.cfg("SOCKET.port")))
         self.TCP_server.data_process = self.socket_data_process
+        self.TCP_server.data_process_stream = self.socket_data_process_stream
         self.version_key = self.cfg("SOCKET.version_key")
         self.keymanager = KeyManager(self.cfg("USERKEY.file_path"))
 
         self.model_list = self.cfg("GPT.models").split(',')
+        token = TokenCounter()
 
     def data_structure(self, data: dict):
         """
@@ -42,7 +48,25 @@ class GPT_Server:
         if data["model"] not in self.model_list:
             return True
         return False
+    
 
+    def socket_data_process_stream(self, user_data: dict,
+                                   ai_reply: str,
+                                   details: dict) -> dict:
+
+        token_promote = self.token.get_token(user_data["model"],
+                             user_data["storyboard"])
+        token_complete = self.token.get_token(user_data["model"],
+                             ai_reply)
+        total_token_used = token_promote + token_complete
+        self.keymanager.decrease_value(user_data["user_key"], 
+                                        total_token_used)
+        reply = {}
+        reply["detail"]["id"] = details["id"]
+        reply["detail"]["model"] = details["model"]
+        reply["detail"]["usage"] = total_token_used
+        reply["detail"]["finish_reason"] = details["choices"][0]["finish_reason"]
+        return reply
 
     def socket_data_process(self, data: dict) -> dict:
         """
@@ -55,6 +79,7 @@ class GPT_Server:
             "storyboard" : [{...},{...},...],
             "temperature" : 1.5,
             "max_tokens" : 200,
+            "stream" : "False"
         }
 
         reply = {
@@ -95,31 +120,85 @@ class GPT_Server:
             reply["message"] = "参数错误, 请检查各项参数是否超出范围"
         
         else:
-            ai_reply = self.gpt_api.query_full(data["storyboard"],
-                                       float(data["temperature"]),
-                                       int(data["max_tokens"]))
-            reply["state"] = "success"
-            reply["message"] = "success"
-            reply["reply"] = ai_reply["choices"][0]["message"]["content"]
-            reply["detail"]["id"] = ai_reply["id"]
-            reply["detail"]["model"] = ai_reply["model"]
-            reply["detail"]["usage"] = ai_reply["usage"]
-            reply["detail"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
+            if data["stream"] == "True":
+                reply["state"] = "success"
+                reply["message"] = "success"
+                reply["usage_promote"] = self.token(data["model"],
+                                                    data["storyboard"])
+                ai_generator = functools.partial(
+                                self.gpt_api.query_stream,
+                                data["storyboard"],
+                                float(data["temperature"]),
+                                int(data["max_tokens"]))
+                return reply, ai_generator
+            
+            else:
+                ai_reply = self.gpt_api.query_full(data["storyboard"],
+                                        float(data["temperature"]),
+                                        int(data["max_tokens"]))
+                reply["state"] = "success"
+                reply["message"] = "success"
+                reply["reply"] = ai_reply["choices"][0]["message"]["content"]
+                reply["detail"]["id"] = ai_reply["id"]
+                reply["detail"]["model"] = ai_reply["model"]
+                reply["detail"]["usage"] = ai_reply["usage"]
+                reply["detail"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
 
-            self.keymanager.decrease_value(data["user_key"], 
-                            ai_reply["usage"]["total_tokens"])
-        
-        return reply
+                self.keymanager.decrease_value(data["user_key"], 
+                                ai_reply["usage"]["total_tokens"])
+                return reply, False
             
     def start(self):
         self.TCP_server.start()
     
 
-def main():
-    gpt_server = GPT_Server()
+@click.group()
+def cli():
+    pass
 
+@click.command(help='run gpt server')
+def run():
+    server = GPT_Server()
     while True:
-        gpt_server.start()
+        server.start()
+        time.sleep(3)
+        print("restart server")
+    
+
+@click.command(help='key manager')
+@click.option('--add', '-a', help='add a new key', is_flag=True)
+@click.option('--delete', '-d', help='delete a key', is_flag=True)
+@click.option('--ls', '-l', help='list all keys', is_flag=True)
+@click.argument('key', type=str, required=False) # n is None
+@click.argument('value', type=int, required=False)
+def key(add, delete, ls, key=None, value=2000):
+    cfg = Config()
+    keymanager = KeyManager(cfg("USERKEY.file_path"))
+    if add:
+        if key == 'n':
+            key = None
+        keymanager.add_key_value(key=key, value=value)
+        print("add key-value")
+        print(key, value)
+    elif delete:
+        if key is None or key == 'n':
+            print("Please enter the correct arguments")
+            return
+        keymanager.remove_key(key)
+        print("delete key")
+        print(key)
+    elif ls:
+        print("list all keys\n")
+        kv = keymanager.get_all_keys_value()
+        print("-"*50)
+        for k, v in kv:
+            print(f"{k:<40s} : {v:<10d}")
+        print("-"*50)
+    else:
+        print("Please enter the correct command")
+
+cli.add_command(key)
+cli.add_command(run)
 
 if __name__ == '__main__':
-    main()
+    cli()

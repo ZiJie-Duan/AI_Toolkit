@@ -9,9 +9,9 @@ class SETTING:
         self.scenario = "助手"
         self.record = True # used to record the dialogue history
 
-        self.host = "47.74.85.241"
+        self.host = ""
         self.port = 12345
-        self.kzf_key = "KZF_KEY_FIRST_VERSION"
+        self.kzf_key = ""
 
         self.max_dialogue = 10
 

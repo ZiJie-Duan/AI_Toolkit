@@ -9,6 +9,7 @@ class TCPServer:
         self.buffer_size = buffer_size
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_process = None
+        self.data_process_stream = None
 
         self.server_socket.bind(self.server_address)
         self.server_socket.listen(5)
@@ -66,16 +67,43 @@ class TCPServer:
             received_dict = self.unpack_data(data)
 
             # 处理数据
-            reply_dict = self.data_process(received_dict)
+            reply_dict, stream = self.data_process(received_dict)
+            if stream:
+                # 打包数据
+                reply_len, reply_data = self.pack_data(reply_dict)
+                # 发送数据长度
+                connection.sendall(reply_len)
+                _reply = connection.recv(self.buffer_size)
+                # 发送数据
+                connection.sendall(reply_data)
+                _reply = connection.recv(self.buffer_size)
+                # sent stream
+                ai_reply = ""
+                cunck = None
+                for cunck in stream:
+                    word = cunck["choices"][0].get("delta", {}).get("content")
+                    ai_reply += word
+                    connection.sendall(word)
+                
+                connection.sendall("/<<--END-->>/".encode("utf-8"))
 
-            # 打包数据
-            reply_len, reply_data = self.pack_data(reply_dict)
+                reply_dict = self.data_process_stream(data,ai_reply,cunck)
+                _reply = connection.recv(self.buffer_size)
+                
+                reply_len, reply_data = self.pack_data(reply_dict)
+                connection.sendall(reply_len)
 
-            # 发送数据长度
-            connection.sendall(reply_len)
-            _reply = connection.recv(self.buffer_size)
-            # 发送数据
-            connection.sendall(reply_data)
+                _reply = connection.recv(self.buffer_size)
+                connection.sendall(reply_data)
+
+            else:
+                # 打包数据
+                reply_len, reply_data = self.pack_data(reply_dict)
+                # 发送数据长度
+                connection.sendall(reply_len)
+                _reply = connection.recv(self.buffer_size)
+                # 发送数据
+                connection.sendall(reply_data)
 
         except Exception as e:
             print(f'异常 来自handle函数: {e}')

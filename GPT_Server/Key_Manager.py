@@ -6,9 +6,9 @@ class KeyManager:
     def __init__(self, file_path="keys.json"):
         self.file_path = file_path
         self.lock = threading.Lock()
-        self.key_value_map = self.load_data()
-
-    def load_data(self):
+        self.key_value_map = self._load_data()
+        
+    def _load_data(self):
         try:
             with open(self.file_path, "r") as file:
                 data = json.load(file)
@@ -16,24 +16,23 @@ class KeyManager:
             data = {}
         return data
 
-    def save_data(self):
-        with self.lock:
-            with open(self.file_path, "w") as file:
-                json.dump(self.key_value_map, file)
+    def _save_data(self):
+        with open(self.file_path, "w") as file:
+            json.dump(self.key_value_map, file)
 
     def add_key_value(self, key=None, value=0.0):
         with self.lock:
             if not key:
                 key = str(uuid.uuid4())
             self.key_value_map[key] = value
-            self.save_data()
+            self._save_data()
         return key
 
     def remove_key(self, key):
         with self.lock:
             if key in self.key_value_map:
                 del self.key_value_map[key]
-                self.save_data()
+                self._save_data()
 
     def check_key(self, key):
         with self.lock:
@@ -50,8 +49,12 @@ class KeyManager:
 
             self.key_value_map[key] -= amount
             
-            self.save_data()
+            self._save_data()
             return True,self.key_value_map[key]
+    
+    def get_all_keys_value(self):
+        with self.lock:
+            return self.key_value_map.items()
 
 # 使用示例
 # key_manager = KeyManager()

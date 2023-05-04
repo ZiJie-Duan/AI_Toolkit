@@ -7,7 +7,6 @@ class CHAT_GUI(tk.Tk):
         super().__init__()
         self.title("康中福 ChatGPT-3.5-turbo")
         self.geometry("800x600")
-        self.iconbitmap('logo.ico')  # 使用自定义图标
         self.create_widgets()
 
         self.settings_callback = None
