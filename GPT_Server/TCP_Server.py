@@ -8,8 +8,6 @@ class TCPServer:
         self.server_address = server_address
         self.buffer_size = buffer_size
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.data_process = None
-        self.data_process_stream = None
 
         self.server_socket.bind(self.server_address)
         self.server_socket.listen(5)
@@ -36,6 +34,34 @@ class TCPServer:
     def unpack_data(self, data: bytes) -> dict:
         return json.loads(data.decode('utf-8'))
     
+    def esay_send(self, sock: object, data: dict) -> dict:
+        data_len, data_pack = self.pack_data(data)
+        # --> 1. send data length
+        sock.sendall(data_len)
+        # <-- 2. recv reply
+        _reply = sock.recv(self.buffer_size)
+        # --> 3. send data
+        sock.sendall(data_pack)
+
+    def esay_recv(self, sock: object) -> dict:
+        # <-- 1. recv data length
+        data_len = sock.recv(self.buffer_size)
+        # --> 2. send reply
+        sock.sendall(b'ok')
+        # <-- 3. recv data
+        user_original_data = self.recv_all(sock, data_len)
+        user_data = self.unpack_data(user_original_data)
+        return user_data
+    
+
+class GPT_TCPServer(TCPServer):
+
+    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+        super().__init__(server_address, buffer_size)
+        self.data_process = self.gpt_process
+        self.data_process_stream = self.gpt_process_stream
+
+
     def start(self):
 
         while True:
@@ -58,52 +84,33 @@ class TCPServer:
             connection = self.context.wrap_socket(orig_connection, server_side=True)
 
             print('连接来自:', client_address)
-            # 接收数据长度
-            data_len = connection.recv(self.buffer_size)
-            connection.sendall(b'ok')
 
-            # 接收数据
-            data = self.recv_all(connection, data_len)
-            received_dict = self.unpack_data(data)
+            user_data = self.esay_recv(connection)
 
-            # 处理数据
-            reply_dict, stream = self.data_process(received_dict)
+            # 处理数据 判断是否为流式数据
+            result_dict, stream = self.data_process(user_data)
             if stream:
-                # 打包数据
-                reply_len, reply_data = self.pack_data(reply_dict)
-                # 发送数据长度
-                connection.sendall(reply_len)
-                _reply = connection.recv(self.buffer_size)
-                # 发送数据
-                connection.sendall(reply_data)
-                _reply = connection.recv(self.buffer_size)
+
+                self.esay_send(connection, result_dict)
+
                 # sent stream
                 ai_reply = ""
-                cunck = None
-                for cunck in stream:
-                    word = cunck["choices"][0].get("delta", {}).get("content")
+                chunk = None
+                for chunk in stream:
+                    word = chunk["choices"][0].get("delta", {}).get("content")
                     ai_reply += word
-                    connection.sendall(word)
-                
+                    # --> 8. 流式发送数据
+                    connection.sendall(word.encode('utf-8'))
+                # --> 9. 流式发送结束标志
                 connection.sendall("/<<--END-->>/".encode("utf-8"))
-
-                reply_dict = self.data_process_stream(data,ai_reply,cunck)
-                _reply = connection.recv(self.buffer_size)
                 
-                reply_len, reply_data = self.pack_data(reply_dict)
-                connection.sendall(reply_len)
-
-                _reply = connection.recv(self.buffer_size)
-                connection.sendall(reply_data)
+                # 生成反馈
+                reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
+                
+                self.esay_send(connection, reply_dict)
 
             else:
-                # 打包数据
-                reply_len, reply_data = self.pack_data(reply_dict)
-                # 发送数据长度
-                connection.sendall(reply_len)
-                _reply = connection.recv(self.buffer_size)
-                # 发送数据
-                connection.sendall(reply_data)
+                self.esay_send(connection, reply_dict)
 
         except Exception as e:
             print(f'异常 来自handle函数: {e}')

@@ -6,7 +6,7 @@ class TokenCounter:
     def __init__(self) -> None:
         self.encoding = tiktoken.get_encoding("cl100k_base")
     
-    def get_token(self,model,messages):
+    def get_token(self,model,messages,user_choice = 1): 
         """Returns the number of tokens used by a list of messages."""
         try:
             encoding = tiktoken.encoding_for_model(model)
@@ -21,7 +21,7 @@ class TokenCounter:
                     if key == "name":  # if there's a name, the role is omitted
                         num_tokens += -1  # role is always required and always 1 token
             num_tokens += 2  # every reply is primed with <im_start>assistant
-            return num_tokens
+            return int(num_tokens * user_choice)
         else:
             raise NotImplementedError(f"""num_tokens_from_messages() is not presently implemented for model {model}.
         See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")

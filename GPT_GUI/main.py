@@ -7,64 +7,115 @@ from Exception_Handler import exception_handler
 import threading
 
 
-class GPT_CORE:
+class GPT_Client:
 
-    def __init__(self, config: Config):
-        self.cfg = config
-        self.tcp_client = TCPClient((
-            self.cfg("SOCKET.host"),
-            self.cfg("SOCKET.port")))
+    def __init__(self, 
+                host, port, 
+                online = False, 
+                key = "None"):
         
-        self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
-        self.gpt_api.set_model(self.cfg("GPT.model"))
-        self.online = self.cfg("SYSTEM.online")
+        self.tcp_client = TCPClient((host,port))
+        self.gpt_api = GPT_API(key)
+        #self.gpt_api.set_model(self.cfg("GPT.model"))
+        self.online = online
+    
+    def set_argument(self,
+                    model: str,
+                    stream: bool = False,
+                    temperature: float = 0.5,
+                    max_tokens: int = 200,
+                    version_key: str = "None",
+                    user_key: str = "None",
+                    normal_call_back = None,
+                    stream_state_callback = None,
+                    stream_update_callback = None,
+                    stream_end_callback = None
+                    ):
+        self.gpt_api.set_model(model)
+        self.model = model
+        self.stream = stream
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.version_key = version_key
+        self.user_key = user_key
+        self.normal_call_back = normal_call_back
+        self.stream_state_callback = stream_state_callback
+        self.stream_update_callback = stream_update_callback
+        self.stream_end_callback = stream_end_callback
 
     @exception_handler
-    def send_message(self,messages: list, call_back) -> None:
+    def send_message(self, messages: list, event_id: str = "") -> None:
         """
         send message to the GPT-3 API and get the response
         """
         if self.online:
-            task = threading.Thread(target=self.get_server_reply,args=(messages,call_back))
+            task = threading.Thread(target=self.get_server_reply,args=(messages,event_id))
             task.start()
         else:
-            task = threading.Thread(target=self.get_GPT_reply,args=(messages,call_back))
+            task = threading.Thread(target=self.get_GPT_reply,args=(messages))
             task.start()
 
     
-    def get_GPT_reply(self, messages: list, call_back):
-        try:
-            reply = self.gpt_api.query(
-                                messages, 
-                                self.cfg("GPT.temperature"),
-                                self.cfg("GPT.tokens"))
-        except:
-            reply = "GPT API出现错误, 请检查网络并联系开发者"
-        call_back(reply)
+    def get_GPT_reply(self, messages: list):
+        if self.stream:
+            try:
+                reply = self.gpt_api.query(
+                            messages, 
+                            self.temperature,
+                            self.max_tokens,
+                            stream = True)
+                
+                #self.stream_state_callback()
+                for chunk in reply:
+                    self.stream_update_callback(
+                        chunk["choices"][0].get("delta", {}).get("content"))
+                self.stream_end_callback("Stream End")
+
+            except:
+                reply = "GPT API出现错误, 请检查网络并联系开发者"
+                self.stream_end_callback(reply)
+        else:
+            try:
+                reply = self.gpt_api.query(
+                                    messages, 
+                                    self.temperature,
+                                    self.max_tokens)
+            except:
+                reply = "GPT API出现错误, 请检查网络并联系开发者"
+            self.normal_call_back(reply)
 
 
-    def get_server_reply(self, messages: str, call_back):
-        ai_response = {}
-        reply = ""
+    def get_server_reply(self, messages: str, event_id: str = "") -> None:
 
-        data = {"key": self.cfg("SOCKET.key"),
-                "storyboard": messages,
-                "temperature": self.cfg("GPT.temperature"),
-                "max_tokens": self.cfg("GPT.tokens")}
+        if self.stream:
+            pass
 
-        try:
-            ai_response = self.tcp_client.start(data)
-        except Exception as e:
-            reply = "网络服务出现错误，请联系开发者"
+        else:
+            ai_response = {}
+            reply = ""
 
-        if ai_response == {}:
-            reply = "网络服务出现错误，请联系开发者"
-        elif ai_response["info"] == "key_error":
-            reply = "程序秘钥错误，请联系开发者，更新程序"
-        elif ai_response["info"] == "success":
-            reply = ai_response["reply"]
+            data = {"version_key": self.version_key,
+                    "user_key": self.user_key,
+                    "model": self.model,
+                    "storyboard": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": self.max_tokens,
+                    "event_id": event_id,
+                    "stream": self.stream}
 
-        call_back(reply)
+            try:
+                ai_response = self.tcp_client.start(data)
+            except Exception as e:
+                reply = "网络服务出现错误，请联系开发者"
+
+            if ai_response == {}:
+                reply = "网络服务出现错误，请联系开发者"
+            elif ai_response["info"] == "key_error":
+                reply = "程序秘钥错误，请联系开发者，更新程序"
+            elif ai_response["info"] == "success":
+                reply = ai_response["reply"]
+
+            self.normal_call_back(reply)
 
 
 class CHAT_CORE:

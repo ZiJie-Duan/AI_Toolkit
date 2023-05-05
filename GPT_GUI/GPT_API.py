@@ -8,36 +8,35 @@ class GPT_API:
     def set_model(self, model: str):
         self.model = model
 
-    def query(self, messages, temperature=0.5, max_tokens=100) -> str:
-        response = openai.ChatCompletion.create(
-            model = self.model,
-            messages = messages,
-            temperature = temperature,
-            max_tokens = max_tokens
-        )
-        return response.choices[0].message.content
-    
-    def query_full(self, messages, temperature=0.5, max_tokens=100) -> str:
-        response = openai.ChatCompletion.create(
-            model = self.model,
-            messages = messages,
-            temperature = temperature,
-            max_tokens = max_tokens
-        )
-        return response
+    def query(self, 
+            messages, 
+            temperature = 0.5, 
+            max_tokens = 100, 
+            stream = False,
+            full = False) -> str:
+        
+        if stream:
+            response = openai.ChatCompletion.create(
+                model = self.model,
+                messages = messages,
+                temperature = temperature,
+                max_tokens = max_tokens,
+                stream=True,
+            )
+            for chunk in response:
+                yield chunk
 
-    def query_stream(self, messages, temperature=0.5, max_tokens=100):
-        response = openai.ChatCompletion.create(
-            model = self.model,
-            messages = messages,
-            temperature = temperature,
-            max_tokens = max_tokens,
-            stream=True,
-        )
-
-        for chunk in response:
-            yield chunk
-
+            return None
+        else:
+            response = openai.ChatCompletion.create(
+                model = self.model,
+                messages = messages,
+                temperature = temperature,
+                max_tokens = max_tokens
+            )
+            if full:
+                return response
+            return response.choices[0].message.content
 
 # if __name__ == "__main__":
 #     API_KEY = "sk-"

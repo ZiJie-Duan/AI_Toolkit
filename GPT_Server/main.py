@@ -20,7 +20,7 @@ class GPT_Server:
         self.keymanager = KeyManager(self.cfg("USERKEY.file_path"))
 
         self.model_list = self.cfg("GPT.models").split(',')
-        token = TokenCounter()
+        self.token = TokenCounter()
 
     def data_structure(self, data: dict):
         """
@@ -55,14 +55,16 @@ class GPT_Server:
                                    details: dict) -> dict:
 
         token_promote = self.token.get_token(user_data["model"],
-                             user_data["storyboard"])
+                             user_data["storyboard"],
+                             self.cfg("USERKEY.user_choice"))
         token_complete = self.token.get_token(user_data["model"],
-                             ai_reply)
+                             ai_reply,
+                             self.cfg("USERKEY.user_choice"))
         total_token_used = token_promote + token_complete
         self.keymanager.decrease_value(user_data["user_key"], 
                                         total_token_used)
         reply = {}
-        reply["detail"]["id"] = details["id"]
+        reply["detail"]["event_id"] = user_data["event_id"]
         reply["detail"]["model"] = details["model"]
         reply["detail"]["usage"] = total_token_used
         reply["detail"]["finish_reason"] = details["choices"][0]["finish_reason"]
@@ -79,6 +81,7 @@ class GPT_Server:
             "storyboard" : [{...},{...},...],
             "temperature" : 1.5,
             "max_tokens" : 200,
+            "event_id" : "12kiw....",
             "stream" : "False"
         }
 
@@ -89,7 +92,7 @@ class GPT_Server:
             "message" : "None", # server feedback message
             "reply" : "None",
             "detail" : {
-                'id': 'chatcmpl-6p9XYPYSTTRi0xEviKjjilqrWU2Ve',
+                "event_id" : "12kiw....",
                 "model" : "gpt-3.5-turbo",
                 'usage': {'prompt_tokens': 56, 'completion_tokens': 31, 'total_tokens': 87},
                 'finish_reason': 'stop',
@@ -136,12 +139,21 @@ class GPT_Server:
                 ai_reply = self.gpt_api.query_full(data["storyboard"],
                                         float(data["temperature"]),
                                         int(data["max_tokens"]))
+                
+                token_promote = self.token.get_token(data["model"],
+                            data["storyboard"],
+                            self.cfg("USERKEY.user_choice"))
+                token_complete = self.token.get_token(data["model"],
+                            ai_reply,
+                            self.cfg("USERKEY.user_choice"))
+                total_token_used = token_promote + token_complete
+                
                 reply["state"] = "success"
                 reply["message"] = "success"
                 reply["reply"] = ai_reply["choices"][0]["message"]["content"]
-                reply["detail"]["id"] = ai_reply["id"]
+                reply["detail"]["event_id"] = data["event_id"]
                 reply["detail"]["model"] = ai_reply["model"]
-                reply["detail"]["usage"] = ai_reply["usage"]
+                reply["detail"]["usage"] = total_token_used
                 reply["detail"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
 
                 self.keymanager.decrease_value(data["user_key"], 
