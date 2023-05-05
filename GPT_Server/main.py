@@ -58,16 +58,16 @@ class GPT_Server:
                              user_data["storyboard"],
                              self.cfg("USERKEY.user_choice"))
         token_complete = self.token.get_token(user_data["model"],
-                             ai_reply,
+                             [{"role":"assistant", "content":ai_reply}],
                              self.cfg("USERKEY.user_choice"))
         total_token_used = token_promote + token_complete
         self.keymanager.decrease_value(user_data["user_key"], 
                                         total_token_used)
-        reply = {}
-        reply["detail"]["event_id"] = user_data["event_id"]
-        reply["detail"]["model"] = details["model"]
-        reply["detail"]["usage"] = total_token_used
-        reply["detail"]["finish_reason"] = details["choices"][0]["finish_reason"]
+        reply = {"details":{}}
+        reply["details"]["event_id"] = user_data["event_id"]
+        reply["details"]["model"] = details["model"]
+        reply["details"]["usage"] = total_token_used
+        reply["details"]["finish_reason"] = details["choices"][0]["finish_reason"]
         return reply
 
     def socket_data_process(self, data: dict) -> dict:
@@ -91,7 +91,7 @@ class GPT_Server:
             # "argument_error"
             "message" : "None", # server feedback message
             "reply" : "None",
-            "detail" : {
+            "details" : {
                 "event_id" : "12kiw....",
                 "model" : "gpt-3.5-turbo",
                 'usage': {'prompt_tokens': 56, 'completion_tokens': 31, 'total_tokens': 87},
@@ -104,30 +104,31 @@ class GPT_Server:
             "state" : "None", 
             "message" : "None", # "max_tokens不能超过2000"
             "reply" : "None",
-            "detail" : {}
+            "details" : {}
         }
-
         if not self.data_structure(data):
-            return reply
+            return reply, False
 
         elif data["version_key"] != self.version_key:
             reply["state"] = "version_key_error"
             reply["message"] = "程序版本密钥错误，请联系开发者，更新程序"
-        
+            return reply, False
+
         elif not self.keymanager.check_key(data["user_key"]):
             reply["state"] = "user_key_error"
             reply["message"] = "用户密钥不存在 或已过期，请重新获取密钥"
+            return reply, False
         
         elif self.argument_check(data):
             reply["state"] = "argument_error"
             reply["message"] = "参数错误, 请检查各项参数是否超出范围"
+            return reply, False
         
         else:
-            if data["stream"] == "True":
+            if data["stream"]:
                 reply["state"] = "success"
                 reply["message"] = "success"
-                reply["usage_promote"] = self.token(data["model"],
-                                                    data["storyboard"])
+                
                 ai_generator = functools.partial(
                                 self.gpt_api.query_stream,
                                 data["storyboard"],
@@ -136,6 +137,7 @@ class GPT_Server:
                 return reply, ai_generator
             
             else:
+                print("OH!")
                 ai_reply = self.gpt_api.query_full(data["storyboard"],
                                         float(data["temperature"]),
                                         int(data["max_tokens"]))
@@ -144,17 +146,17 @@ class GPT_Server:
                             data["storyboard"],
                             self.cfg("USERKEY.user_choice"))
                 token_complete = self.token.get_token(data["model"],
-                            ai_reply,
+                            [{"role":"assistant", "content":ai_reply}],
                             self.cfg("USERKEY.user_choice"))
                 total_token_used = token_promote + token_complete
                 
                 reply["state"] = "success"
                 reply["message"] = "success"
                 reply["reply"] = ai_reply["choices"][0]["message"]["content"]
-                reply["detail"]["event_id"] = data["event_id"]
-                reply["detail"]["model"] = ai_reply["model"]
-                reply["detail"]["usage"] = total_token_used
-                reply["detail"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
+                reply["details"]["event_id"] = data["event_id"]
+                reply["details"]["model"] = ai_reply["model"]
+                reply["details"]["usage"] = total_token_used
+                reply["details"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
 
                 self.keymanager.decrease_value(data["user_key"], 
                                 ai_reply["usage"]["total_tokens"])
@@ -213,4 +215,5 @@ cli.add_command(key)
 cli.add_command(run)
 
 if __name__ == '__main__':
-    cli()
+    #cli()
+    run()

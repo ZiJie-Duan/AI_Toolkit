@@ -40,6 +40,7 @@ class CHAT_GUI(tk.Tk):
 
     # 创建并放置组件
     def create_widgets(self):
+        
         # 创建左侧框架
         self.left_frame = ttk.Frame(self)
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
@@ -131,16 +132,19 @@ class CHAT_GUI(tk.Tk):
         return 'break'  # 阻止在文本输入框中插入换行符
 
     def send_message(self) -> None:
-        self.settings(self, hidden=True)
+        self.settings(hidden=True)
         message = self.message_entry.get("1.0", tk.END).strip()  # 获取多行文本框的内容
         if message:
             self.message_entry.delete("1.0", tk.END)  # 清空多行文本框的内容
             self.send_message_callback(message)
             self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
 
-    def insert_message(self, message: str) -> None:
-        self.dialogue_text.insert(tk.END, message + "\n\n")
-        self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
+    def insert_message(self, message: str, enter=True) -> None:
+        if enter:
+            self.dialogue_text.insert(tk.END, message + "\n\n")
+            self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
+        else:
+            self.dialogue_text.insert(tk.END, message)
     
     def refresh_dialogue(self) -> None:
         self.refresh_dialogue_callback()
@@ -159,8 +163,3 @@ class CHAT_GUI(tk.Tk):
 # if __name__ == "__main__":
 #     chat_gui = ChatGUI()
 #     chat_gui.mainloop()
-
-
-
-
-

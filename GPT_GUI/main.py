@@ -5,7 +5,7 @@ from Config import Config
 from chat_gui import CHAT_GUI
 from Exception_Handler import exception_handler
 import threading
-
+import uuid
 
 class GPT_Client:
 
@@ -150,7 +150,13 @@ class CHAT_CORE:
             refresh_dialogue_callback = self.refresh_dialogue,
             restart_dialogue_callback = self.restart_dialogue
         )
-        self.gpt_core = GPT_Client(self.cfg)
+        self.gpt_core = GPT_Client(self.cfg("SOCKET.host"),
+                                   self.cfg("SOCKET.port"),
+                                   online=self.cfg("SYSTEM.online"),
+                                   key=self.cfg("GPT.api_key"))
+                                   
+
+        self.message_temp = ""
     
     def set_gpt_arguments(self):
         self.gpt_core.set_arguments(
@@ -160,17 +166,37 @@ class CHAT_CORE:
             stream = self.cfg("GPT.stream"),
             version_key = self.cfg("SOCKET.version_key"),
             user_key = self.cfg("SOCKET.user_key"),
-            stream_state_callback = self.cal_bac_gpt,
-            stream_update_callback = self.cal_bac_gpt,
-            stream_end_callback = self.cal_bac_gpt
+            stream_state_callback = self.stream_verify,
+            stream_update_callback = self.stream_update,
+            stream_end_callback = self.stream_end
         )
+    
+    def info_analyze(self,state):
+        if state == "user_key_error":
+            self.print_info("系统","用户密钥错误或过期, 请重新获取")
+        elif state == "version_key_error":
+            self.print_info("系统","软件版本过期, 请联系开发者更新")
+        elif state == "argument_error":
+            self.print_info("系统","参数错误, 请检查设置")
+ 
+    def stream_verify(self,reply):
+        if reply["state"] == "success":
+            self.chat_gui.insert_message(self.cfg("PROMOTE.selected_scenario")+": ",False)
+            return True
+        else:
+            self.info_analyze(reply["state"])
+            return False
+        
+    def stream_update(self,text):
+        self.chat_gui.insert_message(text,False)
+        self.message_temp += text
 
-    def cal_bac_gpt(self,reply):
-        self.chat_gui.insert_message(
-            self.cfg("PROMOTE.selected_scenario")+": "+reply)
-        self.storyboard.ai_insert(reply)
+    def stream_end(self,reply):
+        self.chat_gui.insert_message(" ")
+        self.storyboard.ai_insert(self.message_temp)
         self.storyboard.remove_sys()
         self.update_dialogue_counter()
+        self.message_temp = ""
         #print("token_out:",num_tokens_from_messages(reply))
 
     def send_mesag(self,message):
@@ -199,8 +225,7 @@ class CHAT_CORE:
                 .single_message_front_insert(promot,message)
 
         #print("token_in:",num_tokens_from_messages(dialog))
-        self.gpt_core.send_message(dialog,self.cal_bac_gpt)
-
+        self.gpt_core.send_message(dialog,event_id=str(uuid.uuid4()))
 
     def settings(self, model: str, temperature: float, 
                  max_tokens: int, scenario: str, 
@@ -228,6 +253,7 @@ class CHAT_CORE:
         self.cfg.set("PROMOTE","selected_scenario",scenario)
         self.cfg.set("SOCKET","user_key",user_key)
 
+        self.set_gpt_arguments()
         if not hidden:
             self.print_info("设置已保存", "系统")
         # if scenario_chanege:
@@ -275,8 +301,8 @@ class CHAT_CORE:
                 self.chat_gui.insert_message(
             self.cfg("PROMOTE.selected_scenario")+": "+message["content"])
 
-    def print_info(self, info: str, type: str) -> None:
-        self.chat_gui.insert_message("[{}]: {}".format(type, info))
+    def print_info(self, info: str, role: str) -> None:
+        self.chat_gui.insert_message("[{}]: {}".format(role, info))
 
     def help(self):
         self.print_info("欢迎使用 UI_GPT_v2.1", "系统")
@@ -305,19 +331,19 @@ class CHAT_CORE:
     
 def main():
 
-    try:
-        chat_core = CHAT_CORE()
-        chat_core.help()
-        chat_core.chat_gui.mainloop()
-    except Exception as e:
-        try:
-            chat_core.print_info("错误信息: " + str(e), "系统错误")
-            chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
-        except:
-            pass
-        print(e)
-        print("程序出现错误, 请联系开发者")
-    return 0
+    #try:
+    chat_core = CHAT_CORE()
+    chat_core.help()
+    chat_core.chat_gui.mainloop()
+    # except Exception as e:
+    #     try:
+    #         chat_core.print_info("错误信息: " + str(e), "系统错误")
+    #         chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
+    #     except:
+    #         pass
+    #     print(e)
+    #     print("程序出现错误, 请联系开发者")
+    # return 0
         
 
 if __name__ == "__main__":

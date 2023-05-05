@@ -79,44 +79,45 @@ class GPT_TCPServer(TCPServer):
 
     def handle(self, orig_connection, client_address):
         connection = None
-        try:
-            connection = self.context.wrap_socket(orig_connection, server_side=True)
+        # try:
+        connection = self.context.wrap_socket(orig_connection, server_side=True)
 
-            print('连接来自:', client_address)
+        print('连接来自:', client_address)
 
-            user_data = self.esay_recv(connection)
+        user_data = self.esay_recv(connection)
+        # 处理数据 判断是否为流式数据
+        result_dict, stream = self.data_process(user_data)
+        if stream:
 
-            # 处理数据 判断是否为流式数据
-            result_dict, stream = self.data_process(user_data)
-            if stream:
+            self.esay_send(connection, result_dict)
 
-                self.esay_send(connection, result_dict)
-
-                # sent stream
-                ai_reply = ""
-                chunk = None
-                for chunk in stream:
-                    word = chunk["choices"][0].get("delta", {}).get("content")
+            # sent stream
+            ai_reply = ""
+            chunk = None
+            stream_flow = stream()
+            for chunk in stream_flow:
+                word = chunk["choices"][0].get("delta", {}).get("content")
+                if word:
                     ai_reply += word
                     # --> 8. 流式发送数据
                     connection.sendall(word.encode('utf-8'))
-                # --> 9. 流式发送结束标志
-                connection.sendall("/<<--END-->>/".encode("utf-8"))
-                
-                # 生成反馈
-                reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
-                
-                self.esay_send(connection, reply_dict)
+            # --> 9. 流式发送结束标志
+            connection.sendall("/<<--END-->>/".encode("utf-8"))
+            
+            # 生成反馈
+            reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
+            
+            self.esay_send(connection, reply_dict)
 
-            else:
-                self.esay_send(connection, reply_dict)
+        else:
+            self.esay_send(connection, result_dict)
 
-        except Exception as e:
-            print(f'异常 来自handle函数: {e}')
+        # except Exception as e:
+        #     print(f'异常 来自handle函数: {e}')
 
-        finally:
-            if connection:
-                connection.close()
+        # finally:
+        #     if connection:
+        #         connection.close()
 
 # if __name__ == '__main__':
 #     data_processor = DataProcessor()

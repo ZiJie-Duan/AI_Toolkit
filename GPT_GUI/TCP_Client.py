@@ -47,10 +47,10 @@ class TCPClient:
             decoded_data = recv_data.decode('utf-8')
 
             if self.stream_end in decoded_data:
-                yield recv_data[:decoded_data.index(self.stream_end)]
+                yield decoded_data[:decoded_data.index(self.stream_end)]
                 break
                 
-            yield recv_data
+            yield decoded_data
 
     def send(self, sock: object, data: bytes) -> bytes:
         """
@@ -145,18 +145,23 @@ class GPT_TCPClient(TCPClient):
         """
 
         sec_client_sock = self.connect_server()
+        print("1")
 
         try:
             # 发送请求
             self.send(sec_client_sock, message)
+            print("2")
             reply_dict = self.recv(sec_client_sock)
+            print("3")
             
             # 判断是否通过验证
             if stream_verify(reply_dict):
+                print("4")
                 for recv_data in self.recv_stream_chunk(sec_client_sock):
                     stream_update_call(recv_data)
-
+                print("5")
                 reply_dict = self.recv(sec_client_sock)
+                print("6")
 
         finally:
             sec_client_sock.close()
