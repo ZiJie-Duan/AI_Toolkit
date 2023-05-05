@@ -1,4 +1,4 @@
-from TCP_Client import TCPClient
+from TCP_Client import GPT_TCPClient
 from GPT_API import GPT_API
 from StoryBoard import Memo, StoryBoardx
 from Config import Config
@@ -14,12 +14,12 @@ class GPT_Client:
                 online = False, 
                 key = "None"):
         
-        self.tcp_client = TCPClient((host,port))
+        self.tcp_client = GPT_TCPClient((host,port))
         self.gpt_api = GPT_API(key)
         #self.gpt_api.set_model(self.cfg("GPT.model"))
         self.online = online
     
-    def set_argument(self,
+    def set_arguments(self,
                     model: str,
                     stream: bool = False,
                     temperature: float = 0.5,
@@ -38,10 +38,23 @@ class GPT_Client:
         self.max_tokens = max_tokens
         self.version_key = version_key
         self.user_key = user_key
-        self.normal_call_back = normal_call_back
+
+        # these three callbacks are used for stream mode only
+        # stream_state_callback is used for online mode only
+        # stream_state_callback 
+        #   input: dict
+        #   return: bool, True for continue, False for stop
         self.stream_state_callback = stream_state_callback
+        # stream_update_callback
+        #   input: str
         self.stream_update_callback = stream_update_callback
+        # stream_end_callback
+        #   input: dict {"state": str, "detail":{}, ...}
         self.stream_end_callback = stream_end_callback
+
+        # this callback is used for normal mode only
+        # input: dict {"state": str, "detail":{}, ...}
+        self.normal_call_back = normal_call_back 
 
     @exception_handler
     def send_message(self, messages: list, event_id: str = "") -> None:
@@ -55,7 +68,6 @@ class GPT_Client:
             task = threading.Thread(target=self.get_GPT_reply,args=(messages))
             task.start()
 
-    
     def get_GPT_reply(self, messages: list):
         if self.stream:
             try:
@@ -64,16 +76,16 @@ class GPT_Client:
                             self.temperature,
                             self.max_tokens,
                             stream = True)
-                
                 #self.stream_state_callback()
+                chunk = None
                 for chunk in reply:
                     self.stream_update_callback(
                         chunk["choices"][0].get("delta", {}).get("content"))
-                self.stream_end_callback("Stream End")
+                self.stream_end_callback({"state":"success" ,"detail": {}})
 
             except:
-                reply = "GPT API出现错误, 请检查网络并联系开发者"
-                self.stream_end_callback(reply)
+                err_reply = "GPT API出现错误, 请检查网络并联系开发者"
+                self.stream_end_callback({"state":err_reply ,"detail": {}})
         else:
             try:
                 reply = self.gpt_api.query(
@@ -81,19 +93,28 @@ class GPT_Client:
                                     self.temperature,
                                     self.max_tokens)
             except:
-                reply = "GPT API出现错误, 请检查网络并联系开发者"
-            self.normal_call_back(reply)
-
+                reply = None
+                err_reply = "GPT API出现错误, 请检查网络并联系开发者"
+            self.normal_call_back({"state": err_reply, "reply": reply, "detail": {}})
 
     def get_server_reply(self, messages: str, event_id: str = "") -> None:
 
         if self.stream:
-            pass
+            data = {"version_key": self.version_key,
+                    "user_key": self.user_key,
+                    "model": self.model,
+                    "storyboard": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": self.max_tokens,
+                    "event_id": event_id,
+                    "stream": self.stream}
+            reply = self.tcp_client.request_stream_GPT(data,
+                            self.stream_state_callback,
+                            self.stream_update_callback)
+            self.stream_end_callback(reply)
 
         else:
             ai_response = {}
-            reply = ""
-
             data = {"version_key": self.version_key,
                     "user_key": self.user_key,
                     "model": self.model,
@@ -103,19 +124,8 @@ class GPT_Client:
                     "event_id": event_id,
                     "stream": self.stream}
 
-            try:
-                ai_response = self.tcp_client.start(data)
-            except Exception as e:
-                reply = "网络服务出现错误，请联系开发者"
-
-            if ai_response == {}:
-                reply = "网络服务出现错误，请联系开发者"
-            elif ai_response["info"] == "key_error":
-                reply = "程序秘钥错误，请联系开发者，更新程序"
-            elif ai_response["info"] == "success":
-                reply = ai_response["reply"]
-
-            self.normal_call_back(reply)
+            ai_response = self.tcp_client.request_GPT(data)
+            self.normal_call_back(ai_response)
 
 
 class CHAT_CORE:
@@ -131,8 +141,8 @@ class CHAT_CORE:
             geometry = self.cfg("GUI.geometry"),
             selected_scenario = self.cfg("PROMOTE.selected_scenario"),
             selected_model = self.cfg("GPT.model"),
-            scenario = self.get_scenario(),
-            models = self.get_models(),
+            scenario = self.cfg("PROMOTE.scenario").split(","),
+            models = self.cfg("GPT.models").split(","),
             temperature = self.cfg("GPT.temperature"),
             max_tokens = self.cfg("GPT.tokens"),
             settings_callback = self.settings,
@@ -140,20 +150,21 @@ class CHAT_CORE:
             refresh_dialogue_callback = self.refresh_dialogue,
             restart_dialogue_callback = self.restart_dialogue
         )
-        self.gpt_core = GPT_CORE(self.cfg)
+        self.gpt_core = GPT_Client(self.cfg)
+    
+    def set_gpt_arguments(self):
+        self.gpt_core.set_arguments(
+            model = self.cfg("GPT.model"),
+            temperature = self.cfg("GPT.temperature"),
+            max_tokens = self.cfg("GPT.tokens"),
+            stream = self.cfg("GPT.stream"),
+            version_key = self.cfg("SOCKET.version_key"),
+            user_key = self.cfg("SOCKET.user_key"),
+            stream_state_callback = self.cal_bac_gpt,
+            stream_update_callback = self.cal_bac_gpt,
+            stream_end_callback = self.cal_bac_gpt
+        )
 
-    def get_scenario(self):
-        """
-        get the scenario from the config file
-        """
-        return self.cfg("PROMOTE.scenario").split(",")
-    
-    def get_models(self):
-        """
-        get the models from the config file
-        """
-        return self.cfg("GPT.models").split(",")
-    
     def cal_bac_gpt(self,reply):
         self.chat_gui.insert_message(
             self.cfg("PROMOTE.selected_scenario")+": "+reply)
@@ -192,7 +203,8 @@ class CHAT_CORE:
 
 
     def settings(self, model: str, temperature: float, 
-                 max_tokens: int, scenario: str) -> None:
+                 max_tokens: int, scenario: str, 
+                 user_key: str, hidden: bool = False) -> None:
         """
         set the temperature, max_tokens and scenario
         """
@@ -214,8 +226,10 @@ class CHAT_CORE:
         self.cfg.set("GPT","temperature",temperature)
         self.cfg.set("GPT","tokens",max_tokens)
         self.cfg.set("PROMOTE","selected_scenario",scenario)
+        self.cfg.set("SOCKET","user_key",user_key)
 
-        # self.print_info("设置已保存", "系统")
+        if not hidden:
+            self.print_info("设置已保存", "系统")
         # if scenario_chanege:
         #     self.print_info("情景已切换, 正在 '重启对话' ", "系统")
         #     self.restart_dialogue()
@@ -265,7 +279,7 @@ class CHAT_CORE:
         self.chat_gui.insert_message("[{}]: {}".format(type, info))
 
     def help(self):
-        self.print_info("欢迎使用 UI_GPT_v2.0", "系统")
+        self.print_info("欢迎使用 UI_GPT_v2.1", "系统")
         self.print_info("请遵循OpenAI使用条例", "系统")
         self.print_info(
         """

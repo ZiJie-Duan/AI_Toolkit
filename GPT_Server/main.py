@@ -1,7 +1,7 @@
 
 from GPT_API import GPT_API
 from Config import Config
-from TCP_Server import TCPServer
+from TCP_Server import GPT_TCPServer
 from Key_Manager import KeyManager
 from token_tool import TokenCounter
 import functools
@@ -12,7 +12,7 @@ class GPT_Server:
     def __init__(self):
         self.cfg = Config()
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
-        self.TCP_server = TCPServer((self.cfg("SOCKET.host"), 
+        self.TCP_server = GPT_TCPServer((self.cfg("SOCKET.host"), 
                                      self.cfg("SOCKET.port")))
         self.TCP_server.data_process = self.socket_data_process
         self.TCP_server.data_process_stream = self.socket_data_process_stream

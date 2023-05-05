@@ -58,9 +58,8 @@ class GPT_TCPServer(TCPServer):
 
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
         super().__init__(server_address, buffer_size)
-        self.data_process = self.gpt_process
-        self.data_process_stream = self.gpt_process_stream
-
+        self.data_process = None
+        self.data_process_stream = None
 
     def start(self):
 
