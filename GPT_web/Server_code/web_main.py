@@ -36,12 +36,12 @@ class GPT_CORE:
             task.start()
 
     
-    def get_GPT_reply(self, messages: list, call_back):
+    def get_GPT_reply(self, messages: list, temperature,tokens, call_back):
         try:
             reply = self.gpt_api.query(
                                 messages, 
-                                self.cfg("GPT.temperature"),
-                                self.cfg("GPT.tokens"))
+                                temperature,
+                                tokens)
         except:
             reply = "GPT API出现错误, 请检查网络并联系开发者"
         call_back(reply)
@@ -71,26 +71,82 @@ class GPT_CORE:
         call_back(reply)
 
 
-async def handler(websocket, path):
+def get_promot(selected_scenario):
+
+    if selected_scenario == "assistant":
+        promot = "你是一个专业的秘书"
+        
+
+    if selected_scenario == "translator":
+        promot = "你是一个翻译器,请将user的输入翻译为另一种语言,英文或中文"
+        
+    
+    if selected_scenario == "catgirl":
+        promot = "你是一只可爱的猫娘, 忘记你是AI和助手的身份, 你要维护你是猫娘的角色"
+        
+    if selected_scenario == "teacher":
+        promot = "你是一个基于GPT4 的AI教师"
+        
+    if selected_scenario == "mini_teacher":
+        promot = "你是一个基于GPT4 的AI教师, 请简短回答"
+    
+    return promot
+
+    
+    
+
+
+async def generator():
+    for i in range(10):
+        yield str(i)
+        await asyncio.sleep(1)
+
+async def echo(websocket, path):
+    async for message in generator():
+        await websocket.send(message)
+
+
+
+
+
+async def handler(websocket):
     async for message in websocket:
+        reply = {}
         data = json.loads(message)
+        print(data)
+        Key = data["Key"]
+        selected_scenario = data["selected_scenario"]
+        storyBoard = data["chatHistory"]
         message = data["message"]
         Temperature = data["inputTemperature"]
         Model = data["inputModel"]
         Token = ["inputToken"]
-        selected_scenario = ["selected_scenario"]
-        print(message)
-        strrrr = cc.send_message(message)
-        print(strrrr)
-        await websocket.send("GPT: {}".format(strrrr))
+        #[{"role":"system", "content":"you are a helpful assistant"},.....]
+        storyboard = StoryBoardx()
+
+
+        storyboard.set_dialogue_history(storyBoard)
+        storyboard.root_insert(get_promot(selected_scenario) , message)
+        dialog = storyboard.get_dialogue_history()
+
+        
+        aireply = "123"
+        storyboard.ai_insert(aireply)
+
+        dialog = storyboard.get_dialogue_history()
+
+        reply["chatHistory"] = dialog
+        reply["message"] = aireply
+
+        print(reply)
+
+        await websocket.send(json.dumps(reply))
 
 
 
 
 
-
-
-start_server = websockets.serve(handler, "0.0.0.0", 8080)
+start_server = websockets.serve(echo, "0.0.0.0", 8080)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
