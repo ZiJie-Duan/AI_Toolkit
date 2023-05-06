@@ -4,6 +4,8 @@ from Config import Config
 from TCP_Server import GPT_TCPServer
 from Key_Manager import KeyManager
 from token_tool import TokenCounter
+from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
+from threading import Thread
 import functools
 import click
 import time
@@ -14,6 +16,11 @@ class GPT_Server:
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
         self.TCP_server = GPT_TCPServer((self.cfg("SOCKET.host"), 
                                      self.cfg("SOCKET.port")))
+        
+        self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+        self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
+        self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
+
         self.TCP_server.data_process = self.socket_data_process
         self.TCP_server.data_process_stream = self.socket_data_process_stream
         self.version_key = self.cfg("SOCKET.version_key")
@@ -164,9 +171,13 @@ class GPT_Server:
                 self.keymanager.decrease_value(data["user_key"], 
                                 ai_reply["usage"]["total_tokens"])
                 return reply, False
-    
+
     def start(self):
-        self.TCP_server.start()
+        # 这里改用了多线程　同时启动我们的TCP服务器和Web服务器
+        tcp_server = Thread(target=self.TCP_server.start).start()
+        web_server = Thread(target=self.GPT_WebServer.start).start() 
+        tcp_server.start()
+        web_server.start() # 启动我们的GPT　Web服务器　
     
 
 @click.group()

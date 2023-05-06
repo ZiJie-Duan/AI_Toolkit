@@ -72,6 +72,10 @@ class GPT_Client:
         self.storyboard = storyboard
 
     async def get_GPT_reply(self, messages: list):
+        """
+        这个函数 用来从GPT服务器获取 回复并向前端发送
+
+        """
         reply_user = {}
         try:
             reply = self.gpt_api.query(
@@ -117,7 +121,7 @@ class GPT_Client:
 
 async def handler(websocket, path):
     async for message in websocket:
-        cfg = Config()
+        cfg = Config() # cfg 是一个固定的配置文件，不需要每一次实例化
 
         reply = {}
         data = json.loads(message)
@@ -131,12 +135,15 @@ async def handler(websocket, path):
         Token = int(data["inputToken"])
         massageSendStr = data["massageSendStr"]
         #[{"role":"system", "content":"you are a helpful assistant"},.....]
-        storyboard = StoryBoardx()
+        storyboard = StoryBoardx() #这个需要每一次都实例化 确保所有的 对话都是独立的
 
 
         storyboard.set_dialogue_history(storyBoard)
         storyboard.root_insert(get_promot(selected_scenario) , message)
         dialog = storyboard.get_dialogue_history()
+
+        # 我懂了，我们可以在这个地方 加入很多和 UI 控件的交互，可以用于审核其参数是否正确等
+        # 非常赞！！！
 
         cc = GPT_Client(cfg("SOCKET.host"),
                                    cfg("SOCKET.port"),
@@ -171,10 +178,23 @@ async def handler(websocket, path):
         # await websocket.send(json.dumps(reply))
 
 
+class GPT_WebServer:
+    # 这个类可以用来　当作　前端和后端的传输接口，也就是　ｊａｃｋｙ　你的一部分的“GPT_Client”的作用
+    # 如果Jacky你想的话，可以尝试将代码分层，或者将其结合到一起
+
+    def __init__(self) -> None:
+        self.data_process = None #使用回调函数的方式，导入我们的数据处理函数
+        self.data_process_stream = None #以及流式数据处理函数
+
+        # jakcy 推荐你阅读一下　data＿ｐｒｏｃｅｓｓ　的源码，这个函数是一个回调函数，你可以在这里加入你的数据处理函数
+        #　而data_process_stream是一个流式数据处理函数，这两个函数会被调用，
+        #　data_process会分辨　调用方是否为流传输，并且进行请求审查，如果是流传输，我们需要调用data_process_stream并传入相应的参数
+    
+    def run(self):
+        # 这个函数用来启动我们的服务器,　
+        start_server = websockets.serve(handler, "0.0.0.0", 8080)
+
+        asyncio.get_event_loop().run_until_complete(start_server)
+        asyncio.get_event_loop().run_forever()
 
 
-
-start_server = websockets.serve(handler, "0.0.0.0", 8080)
-
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
