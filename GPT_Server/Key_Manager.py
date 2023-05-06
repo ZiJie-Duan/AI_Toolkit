@@ -36,8 +36,7 @@ class KeyManager:
 
     def check_key(self, key):
         with self.lock:
-            value = key in self.key_value_map
-            return value
+            return key in self.key_value_map
 
     def decrease_value(self, key, amount):
         with self.lock:
@@ -46,6 +45,7 @@ class KeyManager:
 
             if self.key_value_map[key] < amount:
                 del self.key_value_map[key]
+                self._save_data()
                 return True,0
 
             self.key_value_map[key] -= amount

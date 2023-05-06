@@ -173,11 +173,11 @@ class CHAT_CORE:
     
     def info_analyze(self,state):
         if state == "user_key_error":
-            self.print_info("系统","用户密钥错误或过期, 请重新获取")
+            self.print_info("用户密钥错误或过期, 请重新获取","系统")
         elif state == "version_key_error":
-            self.print_info("系统","软件版本过期, 请联系开发者更新")
+            self.print_info("软件版本过期, 请联系开发者更新","系统")
         elif state == "argument_error":
-            self.print_info("系统","参数错误, 请检查设置")
+            self.print_info("参数错误, 请检查设置","系统")
  
     def stream_verify(self,reply):
         if reply["state"] == "success":
@@ -188,11 +188,11 @@ class CHAT_CORE:
             return False
         
     def stream_update(self,text):
-        self.chat_gui.insert_message(text,False)
+        self.chat_gui.insert_message(text, enter = False)
         self.message_temp += text
 
     def stream_end(self,reply):
-        self.chat_gui.insert_message(" ")
+        self.chat_gui.insert_message("")
         self.storyboard.ai_insert(self.message_temp)
         self.storyboard.remove_sys()
         self.update_dialogue_counter()
@@ -200,9 +200,9 @@ class CHAT_CORE:
         #print("token_out:",num_tokens_from_messages(reply))
 
     def send_mesag(self,message):
-        self.chat_gui.insert_message("用户: " + message)
+        self.chat_gui.insert_message("\n用户: " + message)
         if self.cfg("PROMOTE.selected_scenario") == "assistant":
-            promot = "你是一个专业的秘书"
+            promot = "你是一个人类"
             dialog = self.storyboard.root_insert(promot,message)
 
         if self.cfg("PROMOTE.selected_scenario") == "translator":
@@ -229,23 +229,24 @@ class CHAT_CORE:
 
     def settings(self, model: str, temperature: float, 
                  max_tokens: int, scenario: str, 
-                 user_key: str, hidden: bool = False) -> None:
+                 user_key: str, hidden: bool = False) -> bool:
         """
         set the temperature, max_tokens and scenario
+        return True if the settings are valid
         """
         # scenario_chanege = False
         # if self.cfg("PROMOTE.selected_scenario") != scenario:
         #     scenario_chanege = True
 
-        if temperature < self.cfg("GPT.min_temperature")\
-            or temperature > self.cfg("GPT.max_temperature"):
-            self.print_info("温度值错误, 请重新设置", "系统")
-            return
+        # if temperature < self.cfg("GPT.min_temperature")\
+        #     or temperature > self.cfg("GPT.max_temperature"):
+        #     self.print_info("温度值错误, 请重新设置", "系统")
+        #     return False
         
-        if max_tokens < self.cfg("GPT.min_tokens")\
-            or max_tokens > self.cfg("GPT.max_tokens"):
-            self.print_info("Max_Tokens数错误, 请重新设置", "系统")
-            return
+        # if max_tokens < self.cfg("GPT.min_tokens")\
+        #     or max_tokens > self.cfg("GPT.max_tokens"):
+        #     self.print_info("Max_Tokens数错误, 请重新设置", "系统")
+        #     return False
         
         self.cfg.set("GPT","model",model)
         self.cfg.set("GPT","temperature",temperature)
@@ -256,6 +257,7 @@ class CHAT_CORE:
         self.set_gpt_arguments()
         if not hidden:
             self.print_info("设置已保存", "系统")
+        return True
         # if scenario_chanege:
         #     self.print_info("情景已切换, 正在 '重启对话' ", "系统")
         #     self.restart_dialogue()
