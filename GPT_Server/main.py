@@ -49,7 +49,6 @@ class GPT_Server:
             return True
         return False
     
-
     def socket_data_process_stream(self, user_data: dict,
                                    ai_reply: str,
                                    details: dict) -> dict:
@@ -102,7 +101,7 @@ class GPT_Server:
         """
         reply = {
             "state" : "None", 
-            "message" : "None", # "max_tokens不能超过2000"
+            "message" : "None",
             "reply" : "None",
             "details" : {}
         }
@@ -130,17 +129,21 @@ class GPT_Server:
                 reply["message"] = "success"
                 
                 ai_generator = functools.partial(
-                                self.gpt_api.query_stream,
+                                self.gpt_api.query,
                                 data["storyboard"],
                                 float(data["temperature"]),
-                                int(data["max_tokens"]))
+                                int(data["max_tokens"]),
+                                data["model"],
+                                stream=True,
+                                full=True)
                 return reply, ai_generator
             
             else:
-                print("OH!")
-                ai_reply = self.gpt_api.query_full(data["storyboard"],
+                ai_reply = self.gpt_api.query(data["storyboard"],
                                         float(data["temperature"]),
-                                        int(data["max_tokens"]))
+                                        int(data["max_tokens"]),
+                                        data["model"],
+                                        full=True)
                 
                 token_promote = self.token.get_token(data["model"],
                             data["storyboard"],
@@ -161,7 +164,7 @@ class GPT_Server:
                 self.keymanager.decrease_value(data["user_key"], 
                                 ai_reply["usage"]["total_tokens"])
                 return reply, False
-            
+    
     def start(self):
         self.TCP_server.start()
     

@@ -2,6 +2,7 @@ import socket
 import json
 import threading
 import ssl
+from pprint import pprint
 
 class TCPServer:
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
@@ -64,7 +65,7 @@ class GPT_TCPServer(TCPServer):
     def start(self):
 
         while True:
-            print('等待客户端连接...')
+            print('\n等待客户端连接...')
             orig_connection, client_address = self.server_socket.accept()
             try:
                 new_thread = threading.Thread(target=self.handle, args=(orig_connection, client_address))
@@ -83,8 +84,8 @@ class GPT_TCPServer(TCPServer):
         connection = self.context.wrap_socket(orig_connection, server_side=True)
 
         print('连接来自:', client_address)
-
         user_data = self.esay_recv(connection)
+        pprint(user_data)
         # 处理数据 判断是否为流式数据
         result_dict, stream = self.data_process(user_data)
         if stream:
@@ -95,15 +96,17 @@ class GPT_TCPServer(TCPServer):
             ai_reply = ""
             chunk = None
             stream_flow = stream()
+            print("\nAI: ",end="")
             for chunk in stream_flow:
                 word = chunk["choices"][0].get("delta", {}).get("content")
                 if word:
+                    print(word,end="")
                     ai_reply += word
                     # --> 8. 流式发送数据
                     connection.sendall(word.encode('utf-8'))
             # --> 9. 流式发送结束标志
             connection.sendall("/<<--END-->>/".encode("utf-8"))
-            
+            print()
             # 生成反馈
             reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
             

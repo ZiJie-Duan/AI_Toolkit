@@ -52,7 +52,7 @@ class TCPClient:
                 
             yield decoded_data
 
-    def send(self, sock: object, data: bytes) -> bytes:
+    def easy_send(self, sock: object, data: bytes) -> bytes:
         """
         send data to server
         """
@@ -65,7 +65,7 @@ class TCPClient:
         # --> 3. send data
         sock.sendall(data_pack)
     
-    def recv(self, sock: object) -> bytes:
+    def easy_recv(self, sock: object) -> bytes:
         """
         send data to server and recv reply
         """
@@ -110,8 +110,8 @@ class TCPClient:
         sec_client_sock = self.connect_server(self)
 
         try:
-            self.send(sec_client_sock,data_dict)
-            server_reply = self.recv(sec_client_sock)
+            self.easy_send(sec_client_sock,data_dict)
+            server_reply = self.easy_recv(sec_client_sock)
 
         except Exception as e:
             print("error from TCP_Client: ", e)
@@ -145,23 +145,16 @@ class GPT_TCPClient(TCPClient):
         """
 
         sec_client_sock = self.connect_server()
-        print("1")
-
         try:
             # 发送请求
-            self.send(sec_client_sock, message)
-            print("2")
-            reply_dict = self.recv(sec_client_sock)
-            print("3")
+            self.easy_send(sec_client_sock, message)
+            reply_dict = self.easy_recv(sec_client_sock)
             
             # 判断是否通过验证
             if stream_verify(reply_dict):
-                print("4")
                 for recv_data in self.recv_stream_chunk(sec_client_sock):
                     stream_update_call(recv_data)
-                print("5")
-                reply_dict = self.recv(sec_client_sock)
-                print("6")
+                reply_dict = self.easy_recv(sec_client_sock)
 
         finally:
             sec_client_sock.close()

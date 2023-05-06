@@ -119,8 +119,7 @@ class CHAT_GUI(tk.Tk):
         scenario = self.scenario_combobox.get()
         user_key = self.user_key_entry.get()
 
-        if self.settings_callback:
-            self.settings_callback( str(model),
+        return self.settings_callback( str(model),
                                     float(temperature), 
                                     int(max_tokens),
                                     scenario,
@@ -132,16 +131,16 @@ class CHAT_GUI(tk.Tk):
         return 'break'  # 阻止在文本输入框中插入换行符
 
     def send_message(self) -> None:
-        self.settings(hidden=True)
-        message = self.message_entry.get("1.0", tk.END).strip()  # 获取多行文本框的内容
-        if message:
-            self.message_entry.delete("1.0", tk.END)  # 清空多行文本框的内容
-            self.send_message_callback(message)
-            self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
+        if self.settings(hidden=True):
+            message = self.message_entry.get("1.0", tk.END).strip()  # 获取多行文本框的内容
+            if message:
+                self.message_entry.delete("1.0", tk.END)  # 清空多行文本框的内容
+                self.send_message_callback(message)
+                self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
 
     def insert_message(self, message: str, enter=True) -> None:
         if enter:
-            self.dialogue_text.insert(tk.END, message + "\n\n")
+            self.dialogue_text.insert(tk.END, message + "\n")
             self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
         else:
             self.dialogue_text.insert(tk.END, message)
