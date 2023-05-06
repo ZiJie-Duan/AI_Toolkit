@@ -120,6 +120,7 @@ class GPT_Client:
                 key = "None",):
         
         self.tcp_client = GPT_TCPClient((host,port))
+        print(key)
         self.gpt_api = GPT_API(key)
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -127,8 +128,8 @@ class GPT_Client:
         self.websocket = websocket
         self.storyboard = storyboard
 
-    def get_GPT_reply(self, messages: list):
-            
+    async def get_GPT_reply(self, messages: list):
+        reply_user = {}
         try:
             reply = self.gpt_api.query(
                         messages, 
@@ -139,31 +140,33 @@ class GPT_Client:
             chunk = None
             messagecurren = []
             for chunk in reply:
-                reply["chatHistory"] = messages
-                reply["message"] = chunk
-                reply["state"] = "not done"
-                reply["messageID"] = self.messageID
-                messagecurren.append(chunk)
-                self.websocket.send(json.dumps(reply))
+                if chunk["choices"][0].get("delta", {}).get("content") is None:
+                    continue
+                reply_user["chatHistory"] = messages
+                reply_user["message"] = chunk["choices"][0].get("delta", {}).get("content")
+                reply_user["state"] = "not done"
+                reply_user["messageID"] = self.messageID
+                messagecurren.append(reply_user["message"])
+                await self.websocket.send(json.dumps(reply_user))
 
 
             messagecurren = "".join(messagecurren)
             self.storyboard.ai_insert(messagecurren)
             dialog = self.storyboard.get_dialogue_history()
 
-            reply["chatHistory"] = dialog
-            reply["message"] = messagecurren
-            reply["state"] = "done"
-            reply["messageID"] = self.messageID
-            self.websocket.send(json.dumps(reply))
+            reply_user["chatHistory"] = dialog
+            reply_user["message"] = None
+            reply_user["state"] = "done"
+            reply_user["messageID"] = self.messageID
+            await self.websocket.send(json.dumps(reply_user))
 
         except:
             err_reply = "GPT API出现错误, 请检查网络并联系开发者"
-            reply["chatHistory"] = messages
-            reply["message"] = err_reply
-            reply["state"] = "done"
-            reply["messageID"] = self.messageID
-            self.websocket.send(json.dumps(reply))
+            reply_user["chatHistory"] = messages
+            reply_user["message"] = err_reply
+            reply_user["state"] = "done"
+            reply_user["messageID"] = self.messageID
+            await self.websocket.send(json.dumps(reply_user))
     
 
 
@@ -180,10 +183,10 @@ async def handler(websocket, path):
         selected_scenario = data["selected_scenario"]
         storyBoard = data["chatHistory"]
         message = data["message"]
-        Temperature = data["inputTemperature"]
+        Temperature = float(data["inputTemperature"])
         Model = data["inputModel"]
-        Token = ["inputToken"]
-        massageSendStr = ["massageSendStr"]
+        Token = int(data["inputToken"])
+        massageSendStr = data["massageSendStr"]
         #[{"role":"system", "content":"you are a helpful assistant"},.....]
         storyboard = StoryBoardx()
 
@@ -202,7 +205,7 @@ async def handler(websocket, path):
                                    online=cfg("SYSTEM.online"),
                                    key=cfg("GPT.api_key"),)
         
-        cc.get_GPT_reply(dialog)
+        await cc.get_GPT_reply(dialog)
 
         
         
