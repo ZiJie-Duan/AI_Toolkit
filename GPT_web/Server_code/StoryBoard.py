@@ -19,10 +19,16 @@ class Memo:
 
 
 class StoryBoard:
-    def __init__(self, memo: Memo):
+    def __init__(self, memo: Memo = None):
         self.memo = memo
-        self.dialogue_history = self.memo.read_from_file()
+        self.dialogue_history = self.init_dialogue_history()
     
+    def init_dialogue_history(self):
+        if self.memo:
+            return self.memo.read_from_file()
+        else:
+            return []
+
     def add_dialogue(self, role: str, content: str, index=None):
         if index:
             self.dialogue_history.insert(index,
@@ -39,12 +45,13 @@ class StoryBoard:
         self.dialogue_history = dialogue_history[:]
     
     def save(self):
-        self.memo.write_to_file(self.dialogue_history)
+        if self.memo:
+            self.memo.write_to_file(self.dialogue_history)
 
 
 class StoryBoardx(StoryBoard):
 
-    def __init__(self, memo: Memo):
+    def __init__(self, memo: Memo = None):
         super().__init__(memo)
     
     def root_insert(self,promote,message):

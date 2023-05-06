@@ -3,6 +3,7 @@ import asyncio
 import websockets
 from Config import Config
 from TCP_Client import TCPClient
+from TCP_Client import GPT_TCPClient
 from GPT_API import GPT_API
 from StoryBoard import Memo, StoryBoardx
 from Exception_Handler import exception_handler
@@ -105,12 +106,73 @@ async def echo(websocket, path):
     async for message in generator():
         await websocket.send(message)
 
+class GPT_Client:
+
+    def __init__(self, 
+                host, port, 
+                
+                temperature: float = 0.5,
+                max_tokens: int = 200,
+                messageID = None,
+                websocket = None,
+                storyboard = None,
+                online = False, 
+                key = "None",):
+        
+        self.tcp_client = GPT_TCPClient((host,port))
+        self.gpt_api = GPT_API(key)
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.messageID = messageID
+        self.websocket = websocket
+        self.storyboard = storyboard
+
+    def get_GPT_reply(self, messages: list):
+            
+        try:
+            reply = self.gpt_api.query(
+                        messages, 
+                        self.temperature,
+                        self.max_tokens,
+                        stream = True)
+            #self.stream_state_callback()
+            chunk = None
+            messagecurren = []
+            for chunk in reply:
+                reply["chatHistory"] = messages
+                reply["message"] = chunk
+                reply["state"] = "not done"
+                reply["messageID"] = self.messageID
+                messagecurren.append(chunk)
+                self.websocket.send(json.dumps(reply))
+
+
+            messagecurren = "".join(messagecurren)
+            self.storyboard.ai_insert(messagecurren)
+            dialog = self.storyboard.get_dialogue_history()
+
+            reply["chatHistory"] = dialog
+            reply["message"] = messagecurren
+            reply["state"] = "done"
+            reply["messageID"] = self.messageID
+            self.websocket.send(json.dumps(reply))
+
+        except:
+            err_reply = "GPT API出现错误, 请检查网络并联系开发者"
+            reply["chatHistory"] = messages
+            reply["message"] = err_reply
+            reply["state"] = "done"
+            reply["messageID"] = self.messageID
+            self.websocket.send(json.dumps(reply))
+    
 
 
 
 
-async def handler(websocket):
+async def handler(websocket, path):
     async for message in websocket:
+        cfg = Config()
+
         reply = {}
         data = json.loads(message)
         print(data)
@@ -121,6 +183,7 @@ async def handler(websocket):
         Temperature = data["inputTemperature"]
         Model = data["inputModel"]
         Token = ["inputToken"]
+        massageSendStr = ["massageSendStr"]
         #[{"role":"system", "content":"you are a helpful assistant"},.....]
         storyboard = StoryBoardx()
 
@@ -129,24 +192,43 @@ async def handler(websocket):
         storyboard.root_insert(get_promot(selected_scenario) , message)
         dialog = storyboard.get_dialogue_history()
 
+        cc = GPT_Client(cfg("SOCKET.host"),
+                                   cfg("SOCKET.port"),
+                                   Temperature,
+                                   Token,
+                                   massageSendStr,
+                                   websocket,
+                                   storyboard,
+                                   online=cfg("SYSTEM.online"),
+                                   key=cfg("GPT.api_key"),)
         
-        aireply = "123"
-        storyboard.ai_insert(aireply)
+        cc.get_GPT_reply(dialog)
 
-        dialog = storyboard.get_dialogue_history()
-
-        reply["chatHistory"] = dialog
-        reply["message"] = aireply
-
-        print(reply)
-
-        await websocket.send(json.dumps(reply))
+        
+        
 
 
 
+        # storyboard.ai_insert(aireply)
+
+        # dialog = storyboard.get_dialogue_history()
+
+        # state = "done"
+
+        # reply["chatHistory"] = dialog
+        # reply["message"] = aireply
+        # reply["state"] = state
+        # reply["messageID"] = massageSendStr
+
+        # print(reply)
+
+        # await websocket.send(json.dumps(reply))
 
 
-start_server = websockets.serve(echo, "0.0.0.0", 8080)
+
+
+
+start_server = websockets.serve(handler, "0.0.0.0", 8080)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()

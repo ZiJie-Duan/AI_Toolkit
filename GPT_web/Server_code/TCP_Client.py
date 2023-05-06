@@ -10,8 +10,12 @@ class TCPClient:
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
         self.host, self.port = server_address
         self.buffer_size = buffer_size
+        self.stream_end = "/<<--END-->>/"
 
     def recv_all(self, sock: object, data_len: bytes) -> bytes:
+        """
+        recv all the data from socket with the data_len
+        """
         data = b''
         remaining = int(data_len.decode('utf-8'))
         while remaining > 0:
@@ -19,27 +23,66 @@ class TCPClient:
             data += recv_data
             remaining -= len(recv_data)
         return data
-    
-    def recv_stream(self, sock: object) -> bytes:
-        recv_data = sock.recv().encode('utf-8')
-        return recv_data
 
     def pack_data(self, data: dict) -> tuple[bytes, bytes]:
+        """
+        pack data into bytes and calculate the length of the data
+        """
         data = json.dumps(data).encode('utf-8')
         data_len = str(len(data)).encode('utf-8')
         return data_len, data
     
     def unpack_data(self, data: bytes) -> dict:
+        """
+        unpack data from bytes
+        """
         return json.loads(data.decode('utf-8'))
 
-    def start(self, 
-              data_dict: dict, 
-              stream = False,
-              stream_state_call = None,
-              stream_update_call = None,
-              stream_final_call = None
-              ) -> dict:
-        
+    def recv_stream_chunk(self, sock: object) -> bytes:
+        """
+        a generator to recv flow data chunk from socket
+        """
+        while True:
+            recv_data = sock.recv(self.buffer_size)
+            decoded_data = recv_data.decode('utf-8')
+
+            if self.stream_end in decoded_data:
+                yield decoded_data[:decoded_data.index(self.stream_end)]
+                break
+                
+            yield decoded_data
+
+    def send(self, sock: object, data: bytes) -> bytes:
+        """
+        send data to server
+        """
+        # pack data
+        data_len, data_pack = self.pack_data(data)
+        # --> 1. send data length
+        sock.sendall(data_len)
+        # <-- 2. recv reply
+        _reply = sock.recv(self.buffer_size)
+        # --> 3. send data
+        sock.sendall(data_pack)
+    
+    def recv(self, sock: object) -> bytes:
+        """
+        send data to server and recv reply
+        """
+        # <-- 1. recv data length
+        reply_len = sock.recv(self.buffer_size)
+        # --> 2. send reply
+        sock.sendall(b'ok')
+        # <-- 3. recv data data
+        reply_data_pack = self.recv_all(sock, reply_len)
+        # unpack data
+        reply_data = self.unpack_data(reply_data_pack)
+        return reply_data
+    
+    def connect_server(self):
+        """
+        start a socket and connect to server
+        """
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
          # 创建 SSL/TLS 上下文
         context = ssl.create_default_context()
@@ -47,74 +90,83 @@ class TCPClient:
         context.verify_mode = ssl.CERT_NONE
 
         # 将套接字包装为 SSL/TLS 套接字
-        security_client_socket = context.wrap_socket(client_socket)
-
-        security_client_socket.connect((self.host, self.port))
-
-        if stream:
-            try:
-                data_len, data = self.pack_data(data_dict)
-
-                # send the length of data to remind the server
-                security_client_socket.sendall(data_len)
-                _reply = security_client_socket.recv(self.buffer_size)
-
-                # send the data
-                security_client_socket.sendall(data)
-                # reveive the length of reply
-                reply_len = security_client_socket.recv(self.buffer_size)
-                
-                security_client_socket.sendall(b'ok')
-                # receive the reply
-                reply_data = self.recv_all(security_client_socket, reply_len)
-                
-                reply_dict = self.unpack_data(reply_data)
-
-                if stream_state_call(reply_dict):
-                    while True:
-                        recv_data = self.recv_stream()
-                        if "/<<--END-->>/" not in recv_data:
-                            stream_update_call(recv_data)
-                        else:
-                            break
-                    
-                    # send the data
-                    security_client_socket.sendall(b'ok')
-                    # reveive the length of reply
-                    reply_len = security_client_socket.recv(self.buffer_size)
-
-                    security_client_socket.sendall(b'ok')
-                    # receive the reply
-                    reply_data = self.recv_all(security_client_socket, reply_len)
-                    stream_final_call(reply_data)
-
-            finally:
-                security_client_socket.close()
+        sec_client_sock = context.wrap_socket(client_socket)
         
-            return reply_dict
+        try:
+            sec_client_sock.connect((self.host, self.port))
+        except Exception as e:
+            print("error from TCP_Client: ", e)
+            return None
 
-        else:
-            try:
-                data_len, data = self.pack_data(data_dict)
+        return sec_client_sock
+    
 
-                # send the length of data to remind the server
-                security_client_socket.sendall(data_len)
-                _reply = security_client_socket.recv(self.buffer_size)
+    def request(self, data_dict: dict) -> dict:
+        """
+        a basic request function
+        data_dict and the server_reply are both dict
+        """
+        server_reply = None
+        sec_client_sock = self.connect_server(self)
 
-                # send the data
-                security_client_socket.sendall(data)
-                # reveive the length of reply
-                reply_len = security_client_socket.recv(self.buffer_size)
+        try:
+            self.send(sec_client_sock,data_dict)
+            server_reply = self.recv(sec_client_sock)
 
-                security_client_socket.sendall(b'ok')
-                # receive the reply
-                reply_data = self.recv_all(security_client_socket, reply_len)
-                
-                reply_dict = self.unpack_data(reply_data)
-            finally:
-                security_client_socket.close()
-        
-            return reply_dict
+        except Exception as e:
+            print("error from TCP_Client: ", e)
+            return server_reply
+
+        finally:
+            sec_client_sock.close()
+
+        return server_reply
+    
+
+class GPT_TCPClient(TCPClient):
+
+    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+        super().__init__(server_address, buffer_size)
+    
+    def request_GPT(self, message: dict) -> dict:
+        server_reply = self.request(message)
+        return server_reply
+
+    def request_stream_GPT(self,
+                    message: dict,
+                    stream_verify = None,
+                    stream_update_call = None
+                    ) -> dict:
+        """
+        this function have three methods to return data
+        1. stream_verify
+        2. stream_update_call # update the text chunk
+        3. return reply_dict # return some detail info
+        """
+
+        sec_client_sock = self.connect_server()
+        print("1")
+
+        try:
+            # 发送请求
+            self.send(sec_client_sock, message)
+            print("2")
+            reply_dict = self.recv(sec_client_sock)
+            print("3")
+            
+            # 判断是否通过验证
+            if stream_verify(reply_dict):
+                print("4")
+                for recv_data in self.recv_stream_chunk(sec_client_sock):
+                    stream_update_call(recv_data)
+                print("5")
+                reply_dict = self.recv(sec_client_sock)
+                print("6")
+
+        finally:
+            sec_client_sock.close()
+        return reply_dict
+    
 
 
 # if __name__ == '__main__':

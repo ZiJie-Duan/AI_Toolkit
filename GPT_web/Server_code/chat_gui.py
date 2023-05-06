@@ -12,6 +12,7 @@ class CHAT_GUI(tk.Tk):
                 models = [],
                 temperature = "0.5",
                 max_tokens = "300",
+                user_key = "",
                 settings_callback=None,
                 send_message_callback=None,
                 refresh_dialogue_callback=None,
@@ -28,6 +29,7 @@ class CHAT_GUI(tk.Tk):
         self.scenario = scenario
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.user_key = user_key
 
         self.settings_callback = settings_callback
         self.send_message_callback = send_message_callback
@@ -38,6 +40,7 @@ class CHAT_GUI(tk.Tk):
 
     # 创建并放置组件
     def create_widgets(self):
+        
         # 创建左侧框架
         self.left_frame = ttk.Frame(self)
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
@@ -69,6 +72,13 @@ class CHAT_GUI(tk.Tk):
         self.scenario_combobox = ttk.Combobox(self.left_frame, values=self.scenario)
         self.scenario_combobox.set(self.selected_scenario)
         self.scenario_combobox.pack(side=tk.TOP)
+
+        # 添加 user key 标签和输入框
+        self.user_key_label = ttk.Label(self.left_frame, text="用户密钥:")
+        self.user_key_label.pack(side=tk.TOP, pady=10)
+        self.user_key_entry = ttk.Entry(self.left_frame)
+        self.user_key_entry.pack(side=tk.TOP)
+        self.user_key_entry.insert(0, self.user_key)  # 设置 user key 默认值
 
         # 在左侧框架中添加设置
         self.setting_button = ttk.Button(self.left_frame, text="应用设置", command=self.settings)
@@ -102,32 +112,39 @@ class CHAT_GUI(tk.Tk):
         self.send_button.pack(side=tk.LEFT, padx=10)
 
     # 设置功能函数
-    def settings(self) -> None:
+    def settings(self, hidden=False) -> None:
         model = self.model_combobox.get()
         temperature = self.temperature_entry.get()
         max_tokens = self.max_tokens_entry.get()
         scenario = self.scenario_combobox.get()
+        user_key = self.user_key_entry.get()
 
         if self.settings_callback:
             self.settings_callback( str(model),
                                     float(temperature), 
                                     int(max_tokens),
-                                    scenario)
+                                    scenario,
+                                    user_key,
+                                    hidden=hidden)
     
     def handle_return(self, event):
         self.send_message()
         return 'break'  # 阻止在文本输入框中插入换行符
 
     def send_message(self) -> None:
+        self.settings(hidden=True)
         message = self.message_entry.get("1.0", tk.END).strip()  # 获取多行文本框的内容
         if message:
             self.message_entry.delete("1.0", tk.END)  # 清空多行文本框的内容
             self.send_message_callback(message)
             self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
 
-    def insert_message(self, message: str) -> None:
-        self.dialogue_text.insert(tk.END, message + "\n\n")
-        self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
+    def insert_message(self, message: str, enter=True) -> None:
+        if enter:
+            self.dialogue_text.insert(tk.END, message + "\n\n")
+            self.dialogue_text.see(tk.END)  # 让对话框滚动到最下部以显示最新信息
+        else:
+            self.dialogue_text.insert(tk.END, message)
     
     def refresh_dialogue(self) -> None:
         self.refresh_dialogue_callback()
@@ -146,8 +163,3 @@ class CHAT_GUI(tk.Tk):
 # if __name__ == "__main__":
 #     chat_gui = ChatGUI()
 #     chat_gui.mainloop()
-
-
-
-
-
