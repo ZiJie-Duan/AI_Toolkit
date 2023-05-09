@@ -1,25 +1,34 @@
 
-from GPT_API import GPT_API
-from Config import Config
-from TCP_Server import GPT_TCPServer
-from Key_Manager import KeyManager
-from token_tool import TokenCounter
-from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
+from ..Module.GPT_API import GPT_API
+from ..Module.Config import Config
+from ..Module.TCP_Server import TCPServer
+from ..Module.Key_Manager import KeyManager
+from ..Module.token_tool import TokenCounter
+#from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
 from threading import Thread
+from pprint import pprint
 import functools
 import click
 import time
 
-class GPT_Server:
-    def __init__(self):
+
+class GPT_Server(TCPServer):
+    """
+    a connection between GPT_API and TCP_Server
+    """
+    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+        super().__init__(server_address, buffer_size)
+        self.data_process = None
+        self.data_process_stream = None
+
         self.cfg = Config()
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
-        self.TCP_server = GPT_TCPServer((self.cfg("SOCKET.host"), 
+        self.TCP_server = GPT_TCPServer((self.cfg("SOCKET.host"),  #######重构哈！别忘记了~~~~~~~~~~ 段子杰自己要重构哈！！！！！！！！！
                                      self.cfg("SOCKET.port")))
         
-        self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
-        self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
-        self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
+        # self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+        # self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
+        # self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
 
         self.TCP_server.data_process = self.socket_data_process
         self.TCP_server.data_process_stream = self.socket_data_process_stream
@@ -28,6 +37,66 @@ class GPT_Server:
 
         self.model_list = self.cfg("GPT.models").split(',')
         self.token = TokenCounter()
+    
+    def start(self):
+
+        while True:
+            print('\n等待客户端连接...')
+            orig_connection, client_address = self.server_socket.accept()
+            try:
+                new_thread = threading.Thread(target=self.handle, args=(orig_connection, client_address))
+                new_thread.start()
+            except ssl.SSLError as e:
+                print(f'SSL 错误: {e}')
+                orig_connection.close()
+            except socket.timeout as e:
+                print(f"握手超时: {e}")
+                orig_connection.close()
+
+
+    def handle(self, orig_connection, client_address):
+        connection = None
+        # try:
+        connection = self.context.wrap_socket(orig_connection, server_side=True)
+
+        print('连接来自:', client_address)
+        user_data = self.esay_recv(connection)
+        pprint(user_data)
+        # 处理数据 判断是否为流式数据
+        result_dict, stream = self.data_process(user_data)
+        if stream:
+
+            self.esay_send(connection, result_dict)
+
+            # sent stream
+            ai_reply = ""
+            chunk = None
+            stream_flow = stream()
+            print("\nAI: ",end="")
+            for chunk in stream_flow:
+                word = chunk["choices"][0].get("delta", {}).get("content")
+                if word:
+                    print(word,end="")
+                    ai_reply += word
+                    # --> 8. 流式发送数据
+                    connection.sendall(word.encode('utf-8'))
+            # --> 9. 流式发送结束标志
+            connection.sendall("/<<--END-->>/".encode("utf-8"))
+            print()
+            # 生成反馈
+            reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
+            
+            self.esay_send(connection, reply_dict)
+
+        else:
+            self.esay_send(connection, result_dict)
+
+        # except Exception as e:
+        #     print(f'异常 来自handle函数: {e}')
+
+        # finally:
+        #     if connection:
+        #         connection.close()
 
     def data_structure(self, data: dict):
         """
@@ -174,10 +243,13 @@ class GPT_Server:
 
     def start(self):
         # 这里改用了多线程　同时启动我们的TCP服务器和Web服务器
-        tcp_server = Thread(target=self.TCP_server.start).start()
-        web_server = Thread(target=self.GPT_WebServer.start).start() 
+        tcp_server = Thread(target=self.TCP_server.start)
+        # web_server = Thread(target=self.GPT_WebServer.start).start() 
         tcp_server.start()
-        web_server.start() # 启动我们的GPT　Web服务器　
+        # web_server.start() # 启动我们的GPT　Web服务器　
+
+        # here to wait the tcp server to stop
+        tcp_server.join()
     
 
 @click.group()

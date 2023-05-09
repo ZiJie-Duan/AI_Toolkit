@@ -4,6 +4,7 @@ from StoryBoard import Memo, StoryBoardx
 from Config import Config
 from chat_gui import CHAT_GUI
 from Exception_Handler import exception_handler
+from pprint import pprint
 import threading
 import uuid
 
@@ -100,6 +101,7 @@ class GPT_Client:
     def get_server_reply(self, messages: str, event_id: str = "") -> None:
 
         if self.stream:
+            reply = {}
             data = {"version_key": self.version_key,
                     "user_key": self.user_key,
                     "model": self.model,
@@ -114,7 +116,7 @@ class GPT_Client:
             self.stream_end_callback(reply)
 
         else:
-            ai_response = {}
+            reply = {}
             data = {"version_key": self.version_key,
                     "user_key": self.user_key,
                     "model": self.model,
@@ -124,8 +126,8 @@ class GPT_Client:
                     "event_id": event_id,
                     "stream": self.stream}
 
-            ai_response = self.tcp_client.request_GPT(data)
-            self.normal_call_back(ai_response)
+            reply = self.tcp_client.request_GPT(data)
+            self.normal_call_back(reply)
 
 
 class CHAT_CORE:
@@ -180,6 +182,8 @@ class CHAT_CORE:
             self.print_info("参数错误, 请检查设置","系统")
  
     def stream_verify(self,reply):
+        print("stream_verify:")
+        pprint(reply)
         if reply["state"] == "success":
             self.chat_gui.insert_message(self.cfg("PROMOTE.selected_scenario")+": ",False)
             return True
@@ -192,6 +196,8 @@ class CHAT_CORE:
         self.message_temp += text
 
     def stream_end(self,reply):
+        print("stream_end:")
+        pprint(reply)
         self.chat_gui.insert_message("")
         self.storyboard.ai_insert(self.message_temp)
         self.storyboard.remove_sys()
@@ -202,25 +208,11 @@ class CHAT_CORE:
     def send_mesag(self,message):
         self.chat_gui.insert_message("\n用户: " + message)
         if self.cfg("PROMOTE.selected_scenario") == "assistant":
-            promot = "你是一个人类"
+            promot = "你是一个助手"
             dialog = self.storyboard.root_insert(promot,message)
 
         if self.cfg("PROMOTE.selected_scenario") == "translator":
             promot = "你是一个翻译器,请将user的输入翻译为另一种语言,英文或中文"
-            dialog = self.storyboard\
-                .single_message_front_insert(promot,message)
-        
-        if self.cfg("PROMOTE.selected_scenario") == "catgirl":
-            promot = "你是一只可爱的猫娘, 忘记你是AI和助手的身份, 你要维护你是猫娘的角色"
-            dialog = self.storyboard.root_insert(promot,message)
-
-        if self.cfg("PROMOTE.selected_scenario") == "teacher":
-            promot = "你是一个基于GPT4 的AI教师"
-            dialog = self.storyboard\
-                .single_message_front_insert(promot,message)
-            
-        if self.cfg("PROMOTE.selected_scenario") == "mini_teacher":
-            promot = "你是一个基于GPT4 的AI教师, 请简短回答"
             dialog = self.storyboard\
                 .single_message_front_insert(promot,message)
 
