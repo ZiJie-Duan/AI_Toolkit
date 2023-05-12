@@ -64,13 +64,17 @@ socket.onclose = function(event) {
 
 socket.onmessage = function(event) {
   const jsonData = JSON.parse(event.data);
-  chatHistory = jsonData["chatHistory"];
+  if ( jsonData["chatHistory"] != null) {
+    chatHistory = jsonData["chatHistory"];
+  }
   message = jsonData["message"];
   messageSYS = jsonData["messageSYS"];
   messageID = jsonData["messageID"];
   state = jsonData["state"]
   console.log("Received message from server: ", event.data);
-  if ()
+  if (messageSYS != null) {
+      alert(messageSYS)
+  }
   if (massageInsList[messageID]) {
       if (message == null) {
           message = "";

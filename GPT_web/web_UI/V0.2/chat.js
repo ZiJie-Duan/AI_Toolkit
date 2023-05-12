@@ -91,7 +91,9 @@ function stander(){
   const newMessage = document.createElement("div");
   
   const jsonData = JSON.parse(event.data);
-  chatHistory = jsonData["chatHistory"];
+  if ( jsonData["chatHistory"] != null) {
+    chatHistory = jsonData["chatHistory"];
+  }
   message = jsonData["message"];
   newMessage.classList.add("chat_GPT_style");
   newMessage.textContent = message;

@@ -3,9 +3,40 @@ import websockets
 import asyncio
 import threading
 from module.Config import Config
-from module.StoryBoard import Memo, StoryBoardx
+from module.StoryBoard import Memo, StoryBoard
 from module.TCP_Client import TCPClient
 from module.GPT_API import GPT_API
+
+
+class Chat_StoryBoard(StoryBoard):
+
+    def __init__(self, memo: Memo = None):
+        super().__init__(memo)
+        self.message_dic = {}
+    
+    def add_dialogue_pair(self, question: str, reply: str):
+        self.add_dialogue("user", question)
+        self.add_dialogue("assistant", reply)
+
+    def prompt(self, prompt: str, question: str, event_id: str, 
+               index=None, front=None, back=None):
+        self.message_dic[event_id] = {"user": question}
+        dialogue = self.get_dialogue_history(front, back)
+        
+        dialogue.append({"role": "user", "content": question})
+
+        if index != None:
+            dialogue.insert(index, {"role": "system", "content": prompt})
+        else:
+            dialogue.append({"role": "system", "content": prompt})
+
+        return dialogue
+
+    def insert_reply(self, event_id, reply: str):
+        question = self.message_dic[event_id]["user"]
+        del self.message_dic[event_id]
+        self.add_dialogue_pair(question, reply)
+
 
 class Web_Client:
 
@@ -95,10 +126,10 @@ class GPT_WebServer:
             massageSendStr = data["massageSendStr"]
 
             data = {
-                "version_key" : "123",
+                "version_key" : "GPT_SERVER_KEY_TEST",
                 "user_key" : Key,
                 "model" : model,
-                "storyboard" : storyBoard,
+                "storyboard" : None,
                 "temperature" : Temperature,
                 "max_tokens" : Token,
                 "event_id" : massageSendStr,
@@ -106,27 +137,35 @@ class GPT_WebServer:
             }
 
             #[{"role":"system", "content":"you are a helpful assistant"},.....]
-            storyboard = StoryBoardx()
+            storybd = Chat_StoryBoard()
 
 
-            storyboard.set_dialogue_history(storyBoard)
-            storyboard.root_insert(selected_scenario, message)
-            dialog = storyboard.get_dialogue_history()
-
+            storybd.set_dialogue_history(storyBoard)
+            dialog = storybd.prompt(selected_scenario,message,
+                                       data["event_id"],0)
+            data["storyboard"] = dialog
+            
             reply, ai_generator = self.data_process(data)
             print(ai_generator)
+
+
+        
+            await websocket.send(json.dumps(reply_user))
+
+
             if reply["state"] != "success":
                 reply_user = {
-                    "chatHistory" : storyBoard,
+                    "chatHistory" : None,
                     "message" : None,
                     "messageSYS" : reply["message"],
                     "messageID" : massageSendStr,
                     "state" : "false",
                     'usage' : None,
                 }
-                
+
                 await websocket.send(json.dumps(reply_user))
-            
+                break
+                
             stream = ai_generator()
             stenRecv = ""
             chunk = None
@@ -136,9 +175,9 @@ class GPT_WebServer:
                     stenRecv += word
 
                     reply_user = {
-                        "chatHistory" : storyBoard,
+                        "chatHistory" : None,
                         "message" : word,
-                        "messageSYS" : reply["message"],
+                        "messageSYS" : None,
                         "messageID" : massageSendStr,
                         "state" : "not done",
                         'usage' : None,
@@ -148,14 +187,13 @@ class GPT_WebServer:
             
             feedback = self.stream_feedback(data,stenRecv,chunk)
 
-            messagecurren = "".join(stenRecv)
-            storyboard.ai_insert(messagecurren)
-            dialog = storyboard.get_dialogue_history()
+            storybd.insert_reply(data["event_id"],stenRecv)
+            dialog = storybd.get_dialogue_history()
 
             reply_user = {
                 "chatHistory" : dialog,
                 "message" : None,
-                "messageSYS" : reply["message"],
+                "messageSYS" : None,
                 "messageID" : feedback["details"]["event_id"],
                 "state" : "done",
                 'usage' : feedback["details"]["usage"]
