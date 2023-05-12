@@ -6,7 +6,7 @@ class TokenCounter:
     def __init__(self) -> None:
         self.encoding = tiktoken.get_encoding("cl100k_base")
     
-    def get_token(self,model,messages,user_choice = 1): 
+    def get_token(self,model,messages,user_choice = 1.2): 
         """Returns the number of tokens used by a list of messages."""
         try:
             encoding = tiktoken.encoding_for_model(model)

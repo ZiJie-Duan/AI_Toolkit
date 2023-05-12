@@ -52,7 +52,7 @@ class TCPClient:
                 
             yield decoded_data
 
-    def send(self, sock: object, data: bytes) -> bytes:
+    def easy_send(self, sock: object, data: bytes) -> bytes:
         """
         send data to server
         """
@@ -65,7 +65,7 @@ class TCPClient:
         # --> 3. send data
         sock.sendall(data_pack)
     
-    def recv(self, sock: object) -> bytes:
+    def easy_recv(self, sock: object) -> bytes:
         """
         send data to server and recv reply
         """
@@ -101,71 +101,72 @@ class TCPClient:
         return sec_client_sock
     
 
-    def request(self, data_dict: dict) -> dict:
-        """
-        a basic request function
-        data_dict and the server_reply are both dict
-        """
-        server_reply = None
-        sec_client_sock = self.connect_server(self)
 
-        try:
-            self.send(sec_client_sock,data_dict)
-            server_reply = self.recv(sec_client_sock)
 
-        except Exception as e:
-            print("error from TCP_Client: ", e)
-            return server_reply
+# class GPT_TCPClient(TCPClient):
 
-        finally:
-            sec_client_sock.close()
-
-        return server_reply
+#     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+#         super().__init__(server_address, buffer_size)
     
-
-class GPT_TCPClient(TCPClient):
-
-    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
-        super().__init__(server_address, buffer_size)
+#     def request_GPT(self, message: dict) -> dict:
+#         server_reply = self.request(message)
+#         return server_reply
     
-    def request_GPT(self, message: dict) -> dict:
-        server_reply = self.request(message)
-        return server_reply
+#     def request(self, data_dict: dict) -> dict:
+#         """
+#         a basic request function
+#         data_dict and the server_reply are both dict
+#         """
+#         server_reply = None
+#         sec_client_sock = self.connect_server(self)
 
-    def request_stream_GPT(self,
-                    message: dict,
-                    stream_verify = None,
-                    stream_update_call = None
-                    ) -> dict:
-        """
-        this function have three methods to return data
-        1. stream_verify
-        2. stream_update_call # update the text chunk
-        3. return reply_dict # return some detail info
-        """
+#         try:
+#             self.send(sec_client_sock,data_dict)
+#             server_reply = self.recv(sec_client_sock)
 
-        sec_client_sock = self.connect_server()
-        print("1")
+#         except Exception as e:
+#             print("error from TCP_Client: ", e)
+#             return server_reply
 
-        try:
-            # 发送请求
-            self.send(sec_client_sock, message)
-            print("2")
-            reply_dict = self.recv(sec_client_sock)
-            print("3")
+#         finally:
+#             sec_client_sock.close()
+
+#         return server_reply
+
+#     def request_stream_GPT(self,
+#                     message: dict,
+#                     stream_verify = None,
+#                     stream_update_call = None
+#                     ) -> dict:
+#         """
+#         this function have three methods to return data
+#         1. stream_verify
+#         2. stream_update_call # update the text chunk
+#         3. return reply_dict # return some detail info
+#         """
+
+#         sec_client_sock = self.connect_server()
+#         print("1")
+
+#         try:
+#             # 发送请求
+#             self.send(sec_client_sock, message)
+#             print("2")
+#             reply_dict = self.recv(sec_client_sock)
+#             print("3")
             
-            # 判断是否通过验证
-            if stream_verify(reply_dict):
-                print("4")
-                for recv_data in self.recv_stream_chunk(sec_client_sock):
-                    stream_update_call(recv_data)
-                print("5")
-                reply_dict = self.recv(sec_client_sock)
-                print("6")
+#             # 判断是否通过验证
+#             if stream_verify(reply_dict):
+#                 print("4")
+#                 for recv_data in self.recv_stream_chunk(sec_client_sock):
+#                     stream_update_call(recv_data)
+#                 print("5")
+#                 reply_dict = self.recv(sec_client_sock)
+#                 print("6")
 
-        finally:
-            sec_client_sock.close()
-        return reply_dict
+#         finally:
+#             sec_client_sock.close()
+#         return reply_dict
     
 
 
