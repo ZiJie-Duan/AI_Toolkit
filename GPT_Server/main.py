@@ -217,7 +217,7 @@ class GPT_Server():
             return reply, False
         
         else:
-            if data["stream"] == "True":
+            if data["stream"]:
                
                 reply["state"] = "success"
                 reply["message"] = "success"
