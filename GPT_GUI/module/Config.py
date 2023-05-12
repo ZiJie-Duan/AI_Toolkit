@@ -1,10 +1,10 @@
 import configparser
 from typing import Any
-from Exception_Handler import exception_handler
+from module.Exception_Handler import exception_handler
 
 class Config:
 
-    def __init__(self, path='server_config.ini'):
+    def __init__(self, path='config.ini'):
         self.config = configparser.ConfigParser()
         self.path = path
         self.read(path)

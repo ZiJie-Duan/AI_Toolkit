@@ -1,12 +1,70 @@
-from TCP_Client import GPT_TCPClient
-from GPT_API import GPT_API
-from StoryBoard import Memo, StoryBoardx
-from Config import Config
+from module.TCP_Client import TCPClient
+from module.GPT_API import GPT_API
+from module.StoryBoard import Memo, StoryBoardx
+from module.Config import Config
+from module.Exception_Handler import exception_handler
 from chat_gui import CHAT_GUI
-from Exception_Handler import exception_handler
 from pprint import pprint
 import threading
 import uuid
+
+
+class GPT_TCPClient(TCPClient):
+
+    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+        super().__init__(server_address, buffer_size)
+    
+    def request_GPT(self, data_dict: dict) -> dict:
+        """
+        a basic request function
+        data_dict and the server_reply are both dict
+        """
+        server_reply = None
+        sec_client_sock = self.connect_server(self)
+
+        try:
+            self.easy_send(sec_client_sock,data_dict)
+            server_reply = self.easy_recv(sec_client_sock)
+
+        except Exception as e:
+            print("error from TCP_Client: ", e)
+            return server_reply
+
+        finally:
+            sec_client_sock.close()
+
+        return server_reply
+
+    def request_stream_GPT(self,
+                    message: dict,
+                    stream_verify = None,
+                    stream_update_call = None
+                    ) -> dict:
+        """
+        this function have three methods to return data
+        1. stream_verify
+        2. stream_update_call # update the text chunk
+        3. return reply_dict # return some detail info
+        """
+
+        sec_client_sock = self.connect_server()
+
+        try:
+            # 发送请求
+            self.easy_send(sec_client_sock, message)
+            reply_dict = self.easy_recv(sec_client_sock)
+            
+            # 判断是否通过验证
+            if stream_verify(reply_dict):
+
+                for recv_data in self.recv_stream_chunk(sec_client_sock):
+                    stream_update_call(recv_data)
+
+                reply_dict = self.easy_recv(sec_client_sock)
+
+        finally:
+            sec_client_sock.close()
+        return reply_dict
 
 class GPT_Client:
 
