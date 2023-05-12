@@ -184,7 +184,7 @@ async def handler(websocket, path):
         storyBoard = data["chatHistory"]
         message = data["message"]
         Temperature = float(data["inputTemperature"])
-        Model = data["inputModel"]
+        
         Token = int(data["inputToken"])
         massageSendStr = data["massageSendStr"]
         #[{"role":"system", "content":"you are a helpful assistant"},.....]

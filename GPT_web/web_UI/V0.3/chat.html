@@ -12,7 +12,32 @@
             这是头部
         </header>
         <aside>
-            侧边栏
+            <div class="userprofile">
+                <input id="inputKey" type="text" placeholder="输入密钥">
+            </div>
+
+            <div class="modlesetting">
+                <div class="token">
+                    <label for="inputToken">Token:</label>
+                    <output id="tokenOutput">200</output>
+                    <input type="range" id="inputToken" min="10" max="2000" step="10" value="200" oninput="tokenOutput.value = inputToken.value">
+                </div>
+                <div class="temperature">
+                    <label for="inputTemperature">Temperature:</label>
+                    <output id="temperatureOutput">1</output>
+                    <input type="range" id="inputTemperature" min="0.1" max="1.5" step="0.1" value="1" oninput="temperatureOutput.value = inputTemperature.value">
+                </div>
+                <div>
+                    <select id="inputSnr">
+                        <option value="assistant">assistant</option>
+                        <option value="translator">translator</option>
+                        <option value="catgirl">catgirl</option>
+                        <option value="teacher">teacher</option>
+                        <option value="mini_teacher">mini_teacher</option>
+                    </select>
+                </div>
+            </div>
+
         </aside>
         <div class="chat">
             <div id="chatbox"></div>
