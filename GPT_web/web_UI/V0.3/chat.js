@@ -1,27 +1,36 @@
 
 const chatbox = document.getElementById("chatbox");
-const input = document.getElementById("input");
+var input = document.getElementById("input");
+var enter = document.getElementById("enter")
 
 
 
 
+function prossceSend(){
+  const message = input.value.trim();
 
-input.addEventListener("keydown", function(event) {
+
+  if (message) {
+    const newMessage = document.createElement("div");
+    newMessage.textContent = message;
+    newMessage.classList.add("chat_user_style");
+    chatbox.appendChild(newMessage);
     
-  
-  if (event.key === "Enter") {
-    const message = input.value.trim();
+
+    input.value = "";
+    chat.scrollTop = chat.scrollHeight;
+  }
+}
 
 
-    if (message) {
-      const newMessage = document.createElement("div");
-      newMessage.textContent = message;
-      newMessage.classList.add("chat_user_style");
-      chatbox.appendChild(newMessage);
-      
+enter.addEventListener("click", function() {
 
-      input.value = "";
-      chat.scrollTop = chat.scrollHeight;
-    }
+  prossceSend();
+
+});
+
+input.addEventListener('keypress', function(event) {
+  if (event.key == 'Enter' && event.shiftKey) {
+    prossceSend();
   }
 });
