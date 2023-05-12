@@ -1,6 +1,7 @@
 import json
 import websockets
 import asyncio
+import ssl
 import threading
 from module.Config import Config
 from module.StoryBoard import Memo, StoryBoard
@@ -133,7 +134,7 @@ class GPT_WebServer:
                 "temperature" : Temperature,
                 "max_tokens" : Token,
                 "event_id" : massageSendStr,
-                "stream" : "True"
+                "stream" : True
             }
 
             #[{"role":"system", "content":"you are a helpful assistant"},.....]
@@ -201,6 +202,8 @@ class GPT_WebServer:
             await websocket.send(json.dumps(reply_user))
             
     def start(self):
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain('/www/GPT_python_v3/asjdaskdk/server.crt', '/www/GPT_python_v3/asjdaskdk/server.key')
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
