@@ -36,7 +36,9 @@ class Chat_StoryBoard(StoryBoard):
         question = self.message_dic[event_id]["user"]
         del self.message_dic[event_id]
         self.add_dialogue_pair(question, reply)
-
+    
+    def abandon_event(self, event_id):
+        del self.message_dic[event_id]
 
 class GPT_TCPClient(TCPClient):
 
@@ -289,21 +291,32 @@ class CHAT_CORE:
         self.message_temp += text
 
     def stream_end(self,reply,full_reply):
-        print("stream_end:")
         pprint(reply)
-        event_id = reply["details"]["event_id"]
-        usage = reply["details"]["usage"]
-        finish_reason = reply["details"]["finish_reason"]
 
         self.chat_gui.insert_message("")
-        self.storyboard.insert_reply(event_id,full_reply)
+        event_id = reply["details"]["event_id"]
 
-        self.update_dialogue_counter()
+        if "usage" in reply["details"]:
+            usage = reply["details"]["usage"]
+        if "finish_reason" in reply["details"]:
+            # if details donot have finish_reason
+            # it means the event is abandoned
+            finish_reason = reply["details"]["finish_reason"]
+            self.storyboard.insert_reply(event_id,full_reply)
+
+        else:
+            self.storyboard.abandon_event(event_id)
+
         self.message_temp = ""
-        #print("token_out:",num_tokens_from_messages(reply))
+        self.update_dialogue_counter()
 
     def send_mesag(self,message):
         event_id = str(uuid.uuid4())
+
+        if len(message) > 500:
+            self.print_info("输入过长, 请重新输入","系统")
+            self.print_info(message,"系统")
+            return
 
         self.chat_gui.insert_message("\n用户: " + message)
         if self.cfg("prompt.selected_scenario") == "assistant":
@@ -396,7 +409,7 @@ class CHAT_CORE:
         self.chat_gui.insert_message("[{}]: {}".format(role, info))
 
     def help(self):
-        self.print_info("欢迎使用 UI_GPT_v2.1", "系统")
+        self.print_info("欢迎使用 GPT_GUI_v2.1 Alpha", "系统")
         self.print_info("请遵循OpenAI使用条例", "系统")
         self.print_info(
         """
@@ -418,7 +431,6 @@ class CHAT_CORE:
         self.print_info("'重启对话' 将清空对话记录, 并重新开始对话", "系统")
         self.print_info("'Temperature' 范围 0.1 - 2.0 ", "系统警告")
         self.print_info("'Max_Tokens' 范围 10 - 2000 ", "系统警告")
-        
     
 def main():
 
@@ -436,6 +448,5 @@ def main():
     #     print("程序出现错误, 请联系开发者")
     # return 0
         
-
 if __name__ == "__main__":
     main()
