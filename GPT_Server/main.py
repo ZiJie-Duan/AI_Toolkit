@@ -44,10 +44,12 @@ class GPT_TCP_Server(TCPServer):
         print('[gpt_tcp_server]: 连接来自', client_address)
         user_data = self.esay_recv(connection)
         
+        print("[gpt_tcp_server]: 用户数据(debug)")
         pprint(user_data)
         # 处理数据 判断是否为流式数据
         result_dict, stream = self.data_process(user_data)
         if stream:
+            print("[gpt_tcp_server]: 允许流式数据传输\n")
 
             self.esay_send(connection, result_dict)
 
@@ -65,7 +67,8 @@ class GPT_TCP_Server(TCPServer):
                     connection.sendall(word.encode('utf-8'))
             # --> 9. 流式发送结束标志
             connection.sendall(self.stream_end.encode("utf-8"))
-            print()
+            print("\n[gpt_tcp_server]: 流式数据发送完毕\n")
+
             # 生成反馈
             reply_dict = self.stream_feedback(user_data,ai_reply,chunk)
             
@@ -185,35 +188,39 @@ class GPT_Server():
                 'finish_reason': 'stop',
                 } # API return detail
         }
-
         """
+        
         reply = {
             "state" : "None", 
             "message" : "None",
-            "reply" : "None",
-            "details" : {}
+            "details" : {"event_id" : data["event_id"]}
         }
         if not self.data_structure(data):
+            print("[data_process]: 特殊异常 数据结构错误")
             return reply, False
 
         elif data["version_key"] != self.version_key:
             reply["state"] = "version_key_error"
             reply["message"] = "程序版本密钥错误，请联系开发者，更新程序"
+            print("[data_process]: 程序版本密钥错误")
             return reply, False
 
         elif not self.keymanager.check_key(data["user_key"]):
             reply["state"] = "user_key_error"
             reply["message"] = "用户密钥不存在 或已过期，请重新获取密钥"
+            print("[data_process]: 用户密钥错误")
             return reply, False
         
         elif self.argument_check(data):
             reply["state"] = "argument_error"
             reply["message"] = "参数错误, 请检查各项参数是否超出范围"
+            print("[data_process]: 参数错误")
             return reply, False
         
         elif not self.story_board_check(data["storyboard"]):
             reply["state"] = "argument_error"
             reply["message"] = "故事板角色设定错误, 请检查故事板参数是否正确"
+            print("[data_process]: 故事板角色设定错误")
             return reply, False
         
         else:
@@ -279,11 +286,13 @@ def cli():
 
 @click.command(help='run gpt server')
 def run():
+    print("[main] 初始化服务器...")
     server = GPT_Server()
     while True:
+        print("[main] 进入服务器主循环...\n")
         server.start()
         time.sleep(3)
-        print("restart server")
+        print("[main] 重启服务器...\n")
     
 
 @click.command(help='key manager')
