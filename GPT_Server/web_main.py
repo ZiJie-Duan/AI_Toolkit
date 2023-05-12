@@ -151,7 +151,7 @@ class GPT_WebServer:
 
 
         
-            await websocket.send(json.dumps(reply_user))
+            
 
 
             if reply["state"] != "success":
