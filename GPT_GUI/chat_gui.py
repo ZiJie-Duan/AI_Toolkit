@@ -105,9 +105,9 @@ class CHAT_GUI(tk.Tk):
         self.dialogue_text.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         # 创建消息输入框和发送按钮
-        self.message_entry = tk.Text(self.dialogue_frame, wrap=tk.WORD, height=3)
+        self.message_entry = tk.Text(self.dialogue_frame, wrap=tk.WORD, height=8)
         self.message_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.message_entry.bind('<Return>', self.handle_return)  # 绑定回车键事件
+        #self.message_entry.bind('<Return>', self.handle_return)  # 绑定回车键事件
         self.send_button = ttk.Button(self.dialogue_frame, text="发送", command=self.send_message)
         self.send_button.pack(side=tk.LEFT, padx=10)
 

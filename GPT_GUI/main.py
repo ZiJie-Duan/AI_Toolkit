@@ -313,6 +313,11 @@ class CHAT_CORE:
     def send_mesag(self,message):
         event_id = str(uuid.uuid4())
 
+        if len(message) > 500:
+            self.print_info("输入过长, 请重新输入","系统")
+            self.print_info(message,"系统")
+            return
+
         self.chat_gui.insert_message("\n用户: " + message)
         if self.cfg("prompt.selected_scenario") == "assistant":
             promot = "you are a helpful assistant"
