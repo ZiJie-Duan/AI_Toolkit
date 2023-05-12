@@ -1,12 +1,41 @@
 from module.TCP_Client import TCPClient
 from module.GPT_API import GPT_API
-from module.StoryBoard import Memo, StoryBoardx
+from module.StoryBoard import Memo, StoryBoard
 from module.Config import Config
 from module.Exception_Handler import exception_handler
 from chat_gui import CHAT_GUI
 from pprint import pprint
 import threading
 import uuid
+
+class Chat_StoryBoard(StoryBoard):
+
+    def __init__(self, memo: Memo = None):
+        super().__init__(memo)
+        self.message_dic = {}
+    
+    def add_dialogue_pair(self, question: str, reply: str):
+        self.add_dialogue("user", question)
+        self.add_dialogue("assistant", reply)
+
+    def prompt(self, prompt: str, question: str, event_id: str, 
+               index=None, front=None, back=None):
+        self.message_dic[event_id] = {"user": question}
+        dialogue = self.get_dialogue_history(front, back)
+        
+        dialogue.append({"role": "user", "content": question})
+
+        if index != None:
+            dialogue.insert(index, {"role": "system", "content": prompt})
+        else:
+            dialogue.append({"role": "system", "content": prompt})
+
+        return dialogue
+
+    def insert_reply(self, event_id, reply: str):
+        question = self.message_dic[event_id]["user"]
+        del self.message_dic[event_id]
+        self.add_dialogue_pair(question, reply)
 
 
 class GPT_TCPClient(TCPClient):
@@ -54,17 +83,19 @@ class GPT_TCPClient(TCPClient):
             self.easy_send(sec_client_sock, message)
             reply_dict = self.easy_recv(sec_client_sock)
             
+            full_text = ""
             # 判断是否通过验证
             if stream_verify(reply_dict):
-
-                for recv_data in self.recv_stream_chunk(sec_client_sock):
-                    stream_update_call(recv_data)
+                
+                for text in self.recv_stream_chunk(sec_client_sock):
+                    stream_update_call(text)
+                    full_text += text
 
                 reply_dict = self.easy_recv(sec_client_sock)
 
         finally:
             sec_client_sock.close()
-        return reply_dict
+        return reply_dict, full_text
 
 class GPT_Client:
 
@@ -75,7 +106,6 @@ class GPT_Client:
         
         self.tcp_client = GPT_TCPClient((host,port))
         self.gpt_api = GPT_API(key)
-        #self.gpt_api.set_model(self.cfg("GPT.model"))
         self.online = online
     
     def set_arguments(self,
@@ -136,21 +166,27 @@ class GPT_Client:
                             self.max_tokens,
                             stream = True)
                 #self.stream_state_callback()
+                full_text = ""
                 chunk = None
                 for chunk in reply:
-                    self.stream_update_callback(
-                        chunk["choices"][0].get("delta", {}).get("content"))
-                self.stream_end_callback({"state":"success" ,"detail": {}})
+                    text = chunk["choices"][0].get("delta", {}).get("content")
+                    if text:
+                        self.stream_update_callback(text)
+                        full_text += text
+
+                self.stream_end_callback({"state":"success" ,"detail": {}}, full_text)
 
             except:
                 err_reply = "GPT API出现错误, 请检查网络并联系开发者"
-                self.stream_end_callback({"state":err_reply ,"detail": {}})
+                self.stream_end_callback({"state":err_reply ,"detail": {}}, None)
         else:
             try:
                 reply = self.gpt_api.query(
                                     messages, 
                                     self.temperature,
                                     self.max_tokens)
+                self.normal_call_back({"state": "success", "reply": reply, "detail": {}})
+            
             except:
                 reply = None
                 err_reply = "GPT API出现错误, 请检查网络并联系开发者"
@@ -168,10 +204,10 @@ class GPT_Client:
                     "max_tokens": self.max_tokens,
                     "event_id": event_id,
                     "stream": self.stream}
-            reply = self.tcp_client.request_stream_GPT(data,
+            reply, full_reply = self.tcp_client.request_stream_GPT(data,
                             self.stream_state_callback,
                             self.stream_update_callback)
-            self.stream_end_callback(reply)
+            self.stream_end_callback(reply,full_reply)
 
         else:
             reply = {}
@@ -187,24 +223,24 @@ class GPT_Client:
             reply = self.tcp_client.request_GPT(data)
             self.normal_call_back(reply)
 
-
 class CHAT_CORE:
 
     def __init__(self):
         self.cfg = Config()
 
         self.memo = Memo(self.cfg("MEMO.file_path"))
-        self.storyboard = StoryBoardx(self.memo)
+        self.storyboard = Chat_StoryBoard(self.memo)
 
         self.chat_gui = CHAT_GUI(
             title = self.cfg("GUI.title"),
             geometry = self.cfg("GUI.geometry"),
-            selected_scenario = self.cfg("PROMOTE.selected_scenario"),
+            selected_scenario = self.cfg("PROMPT.selected_scenario"),
             selected_model = self.cfg("GPT.model"),
-            scenario = self.cfg("PROMOTE.scenario").split(","),
+            scenario = self.cfg("PROMPT.scenario").split(","),
             models = self.cfg("GPT.models").split(","),
             temperature = self.cfg("GPT.temperature"),
             max_tokens = self.cfg("GPT.tokens"),
+            user_key = self.cfg("SOCKET.user_key"),
             settings_callback = self.settings,
             send_message_callback = self.send_mesag,
             refresh_dialogue_callback = self.refresh_dialogue,
@@ -215,7 +251,6 @@ class CHAT_CORE:
                                    online=self.cfg("SYSTEM.online"),
                                    key=self.cfg("GPT.api_key"))
                                    
-
         self.message_temp = ""
     
     def set_gpt_arguments(self):
@@ -243,7 +278,7 @@ class CHAT_CORE:
         print("stream_verify:")
         pprint(reply)
         if reply["state"] == "success":
-            self.chat_gui.insert_message(self.cfg("PROMOTE.selected_scenario")+": ",False)
+            self.chat_gui.insert_message(self.cfg("prompt.selected_scenario")+": ",False)
             return True
         else:
             self.info_analyze(reply["state"])
@@ -253,29 +288,33 @@ class CHAT_CORE:
         self.chat_gui.insert_message(text, enter = False)
         self.message_temp += text
 
-    def stream_end(self,reply):
+    def stream_end(self,reply,full_reply):
         print("stream_end:")
         pprint(reply)
+        event_id = reply["details"]["event_id"]
+        usage = reply["details"]["usage"]
+        finish_reason = reply["details"]["finish_reason"]
+
         self.chat_gui.insert_message("")
-        self.storyboard.ai_insert(self.message_temp)
-        self.storyboard.remove_sys()
+        self.storyboard.insert_reply(event_id,full_reply)
+
         self.update_dialogue_counter()
         self.message_temp = ""
         #print("token_out:",num_tokens_from_messages(reply))
 
     def send_mesag(self,message):
+        event_id = str(uuid.uuid4())
+
         self.chat_gui.insert_message("\n用户: " + message)
-        if self.cfg("PROMOTE.selected_scenario") == "assistant":
-            promot = "你是一个助手"
-            dialog = self.storyboard.root_insert(promot,message)
+        if self.cfg("prompt.selected_scenario") == "assistant":
+            promot = "you are a helpful assistant"
+            dialog = self.storyboard.prompt(promot,message,event_id,0)
 
-        if self.cfg("PROMOTE.selected_scenario") == "translator":
-            promot = "你是一个翻译器,请将user的输入翻译为另一种语言,英文或中文"
-            dialog = self.storyboard\
-                .single_message_front_insert(promot,message)
+        if self.cfg("prompt.selected_scenario") == "teacher":
+            promot = "you are a teacher"
+            dialog = self.storyboard.prompt(promot,message,event_id,0)
 
-        #print("token_in:",num_tokens_from_messages(dialog))
-        self.gpt_core.send_message(dialog,event_id=str(uuid.uuid4()))
+        self.gpt_core.send_message(dialog,event_id)
 
     def settings(self, model: str, temperature: float, 
                  max_tokens: int, scenario: str, 
@@ -285,7 +324,7 @@ class CHAT_CORE:
         return True if the settings are valid
         """
         # scenario_chanege = False
-        # if self.cfg("PROMOTE.selected_scenario") != scenario:
+        # if self.cfg("prompt.selected_scenario") != scenario:
         #     scenario_chanege = True
 
         # if temperature < self.cfg("GPT.min_temperature")\
@@ -301,7 +340,7 @@ class CHAT_CORE:
         self.cfg.set("GPT","model",model)
         self.cfg.set("GPT","temperature",temperature)
         self.cfg.set("GPT","tokens",max_tokens)
-        self.cfg.set("PROMOTE","selected_scenario",scenario)
+        self.cfg.set("prompt","selected_scenario",scenario)
         self.cfg.set("SOCKET","user_key",user_key)
 
         self.set_gpt_arguments()
@@ -351,7 +390,7 @@ class CHAT_CORE:
                 self.chat_gui.insert_message("[系统]: " + message["content"])
             else:
                 self.chat_gui.insert_message(
-            self.cfg("PROMOTE.selected_scenario")+": "+message["content"])
+            self.cfg("prompt.selected_scenario")+": "+message["content"])
 
     def print_info(self, info: str, role: str) -> None:
         self.chat_gui.insert_message("[{}]: {}".format(role, info))

@@ -104,6 +104,12 @@ class GPT_Server():
         self.model_list = self.cfg("GPT.models").split(',')
         self.token = TokenCounter()
     
+    def story_board_check(self, storyboard: list) -> bool:
+        for item in storyboard:
+            if item["role"] not in ["user", "assistant", "system"]:
+                return False
+        return True
+
     def data_structure(self, data: dict):
         """
         check the data structure
@@ -175,7 +181,7 @@ class GPT_Server():
             "details" : {
                 "event_id" : "12kiw....",
                 "model" : "gpt-3.5-turbo",
-                'usage': {'prompt_tokens': 56, 'completion_tokens': 31, 'total_tokens': 87},
+                'usage': "2330",
                 'finish_reason': 'stop',
                 } # API return detail
         }
@@ -203,6 +209,11 @@ class GPT_Server():
         elif self.argument_check(data):
             reply["state"] = "argument_error"
             reply["message"] = "参数错误, 请检查各项参数是否超出范围"
+            return reply, False
+        
+        elif not self.story_board_check(data["storyboard"]):
+            reply["state"] = "argument_error"
+            reply["message"] = "故事板角色设定错误, 请检查故事板参数是否正确"
             return reply, False
         
         else:
