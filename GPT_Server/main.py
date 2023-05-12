@@ -4,7 +4,7 @@ from module.Config import Config
 from module.TCP_Server import TCPServer
 from module.Key_Manager import KeyManager
 from module.token_tool import TokenCounter
-#from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
+from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
 from threading import Thread
 import socket
 import ssl
@@ -92,9 +92,9 @@ class GPT_Server():
         self.TCP_server = GPT_TCP_Server((self.cfg("SOCKET.host"), 
                                      self.cfg("SOCKET.port")))
         
-        # self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
-        # self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
-        # self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
+        self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+        self.GPT_WebServer.data_process = self.data_process #使用回调函数的方式，导入我们的数据处理函数
+        self.GPT_WebServer.stream_feedback = self.stream_feedback #以及流式数据处理函数
 
         self.TCP_server.data_process = self.data_process
         self.TCP_server.stream_feedback = self.stream_feedback
@@ -206,7 +206,8 @@ class GPT_Server():
             return reply, False
         
         else:
-            if data["stream"]:
+            if data["stream"] == "True":
+               
                 reply["state"] = "success"
                 reply["message"] = "success"
                 
@@ -220,6 +221,7 @@ class GPT_Server():
                 return reply, ai_generator
             
             else:
+            
                 ai_reply = self.gpt_api.query(data["storyboard"],
                                         float(data["temperature"]),
                                         int(data["max_tokens"]),
@@ -247,14 +249,17 @@ class GPT_Server():
                 return reply, False
 
     def start(self):
+        
         # 这里改用了多线程　同时启动我们的TCP服务器和Web服务器
         tcp_server = Thread(target=self.TCP_server.start)
-        # web_server = Thread(target=self.GPT_WebServer.start).start() 
+        web_server = Thread(target=self.GPT_WebServer.start)
+
         tcp_server.start()
-        # web_server.start() # 启动我们的GPT　Web服务器　
+        web_server.start() # 启动我们的GPT　Web服务器　
 
         # here to wait the tcp server to stop
         tcp_server.join()
+        web_server.join()
     
 
 @click.group()
