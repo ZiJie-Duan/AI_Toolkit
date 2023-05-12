@@ -1,6 +1,6 @@
 import configparser
 from typing import Any
-from Exception_Handler import exception_handler
+from module.Exception_Handler import exception_handler
 
 class Config:
 

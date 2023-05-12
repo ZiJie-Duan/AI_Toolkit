@@ -1,13 +1,13 @@
 import socket
 import json
-import threading
 import ssl
-from pprint import pprint
 
 class TCPServer:
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
         self.server_address = server_address
         self.buffer_size = buffer_size
+        self.stream_end = "/<<--END-->>/"
+
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.server_socket.bind(self.server_address)
@@ -53,6 +53,12 @@ class TCPServer:
         user_original_data = self.recv_all(sock, data_len)
         user_data = self.unpack_data(user_original_data)
         return user_data
+    
+    def start(self):
+        pass
+
+    def handle(self, sock: object, addr: tuple):
+        pass
     
 
 

@@ -1,56 +1,38 @@
 
-from ..Module.GPT_API import GPT_API
-from ..Module.Config import Config
-from ..Module.TCP_Server import TCPServer
-from ..Module.Key_Manager import KeyManager
-from ..Module.token_tool import TokenCounter
+from module.GPT_API import GPT_API
+from module.Config import Config
+from module.TCP_Server import TCPServer
+from module.Key_Manager import KeyManager
+from module.token_tool import TokenCounter
 #from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
 from threading import Thread
+import socket
+import ssl
 from pprint import pprint
 import functools
 import click
 import time
 
+class GPT_TCP_Server(TCPServer):
 
-class GPT_Server(TCPServer):
-    """
-    a connection between GPT_API and TCP_Server
-    """
     def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
         super().__init__(server_address, buffer_size)
         self.data_process = None
-        self.data_process_stream = None
+        self.stream_feedback = None
 
-        self.cfg = Config()
-        self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
-        self.TCP_server = GPT_TCPServer((self.cfg("SOCKET.host"),  #######重构哈！别忘记了~~~~~~~~~~ 段子杰自己要重构哈！！！！！！！！！
-                                     self.cfg("SOCKET.port")))
-        
-        # self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
-        # self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
-        # self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
-
-        self.TCP_server.data_process = self.socket_data_process
-        self.TCP_server.data_process_stream = self.socket_data_process_stream
-        self.version_key = self.cfg("SOCKET.version_key")
-        self.keymanager = KeyManager(self.cfg("USERKEY.file_path"))
-
-        self.model_list = self.cfg("GPT.models").split(',')
-        self.token = TokenCounter()
-    
     def start(self):
 
         while True:
-            print('\n等待客户端连接...')
+            print('\n[gpt_tcp_server]: 等待用户连接...')
             orig_connection, client_address = self.server_socket.accept()
             try:
-                new_thread = threading.Thread(target=self.handle, args=(orig_connection, client_address))
+                new_thread = Thread(target=self.handle, args=(orig_connection, client_address))
                 new_thread.start()
             except ssl.SSLError as e:
-                print(f'SSL 错误: {e}')
+                print(f'[gpt_tcp_server]: SSL 错误 {e}')
                 orig_connection.close()
             except socket.timeout as e:
-                print(f"握手超时: {e}")
+                print(f"[gpt_tcp_server]: 握手超时 {e}")
                 orig_connection.close()
 
 
@@ -59,8 +41,9 @@ class GPT_Server(TCPServer):
         # try:
         connection = self.context.wrap_socket(orig_connection, server_side=True)
 
-        print('连接来自:', client_address)
+        print('[gpt_tcp_server]: 连接来自', client_address)
         user_data = self.esay_recv(connection)
+        
         pprint(user_data)
         # 处理数据 判断是否为流式数据
         result_dict, stream = self.data_process(user_data)
@@ -81,10 +64,10 @@ class GPT_Server(TCPServer):
                     # --> 8. 流式发送数据
                     connection.sendall(word.encode('utf-8'))
             # --> 9. 流式发送结束标志
-            connection.sendall("/<<--END-->>/".encode("utf-8"))
+            connection.sendall(self.stream_end.encode("utf-8"))
             print()
             # 生成反馈
-            reply_dict = self.data_process_stream(user_data,ai_reply,chunk)
+            reply_dict = self.stream_feedback(user_data,ai_reply,chunk)
             
             self.esay_send(connection, reply_dict)
 
@@ -98,6 +81,29 @@ class GPT_Server(TCPServer):
         #     if connection:
         #         connection.close()
 
+
+class GPT_Server():
+    """
+    a connection between GPT_API and TCP_Server
+    """
+    def __init__(self):
+        self.cfg = Config("server_config.ini")
+        self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
+        self.TCP_server = GPT_TCP_Server((self.cfg("SOCKET.host"), 
+                                     self.cfg("SOCKET.port")))
+        
+        # self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+        # self.GPT_WebServer.data_process = self.socket_data_process #使用回调函数的方式，导入我们的数据处理函数
+        # self.GPT_WebServer.data_process_stream = self.socket_data_process_stream #以及流式数据处理函数
+
+        self.TCP_server.data_process = self.data_process
+        self.TCP_server.stream_feedback = self.stream_feedback
+        self.version_key = self.cfg("SOCKET.version_key")
+        self.keymanager = KeyManager(self.cfg("USERKEY.file_path"))
+
+        self.model_list = self.cfg("GPT.models").split(',')
+        self.token = TokenCounter()
+    
     def data_structure(self, data: dict):
         """
         check the data structure
@@ -125,7 +131,7 @@ class GPT_Server(TCPServer):
             return True
         return False
     
-    def socket_data_process_stream(self, user_data: dict,
+    def stream_feedback(self, user_data: dict,
                                    ai_reply: str,
                                    details: dict) -> dict:
 
@@ -145,7 +151,7 @@ class GPT_Server(TCPServer):
         reply["details"]["finish_reason"] = details["choices"][0]["finish_reason"]
         return reply
 
-    def socket_data_process(self, data: dict) -> dict:
+    def data_process(self, data: dict) -> dict:
         """
         example data structure
 
@@ -205,12 +211,11 @@ class GPT_Server(TCPServer):
                 reply["message"] = "success"
                 
                 ai_generator = functools.partial(
-                                self.gpt_api.query,
+                                self.gpt_api.query_stream,
                                 data["storyboard"],
                                 float(data["temperature"]),
                                 int(data["max_tokens"]),
                                 data["model"],
-                                stream=True,
                                 full=True)
                 return reply, ai_generator
             
