@@ -7,6 +7,7 @@ const inputKey = document.getElementById("inputKey");
 // const selectElement = document.getElementById('mySelect');
 const chatbox = document.getElementById("chatbox");
 var input = document.getElementById("input");
+var Customersennario = document.getElementById("Customersennario");
 var token_remainELE = document.getElementById("token_remain");
 var enter = document.getElementById("enter")
 
@@ -86,12 +87,13 @@ socket.onmessage = function(event) {
       if (message == null) {
           message = "";
       }
-      massageInsList[messageID].textContent += message;
+      message = escapeHtml(message.replace(/\n/g, "<br/>").replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;"));
+      massageInsList[messageID].innerHTML += message;
       chatbox.appendChild(massageInsList[messageID]);
   } else {
       massageInsList[messageID] = document.createElement("div");
       massageInsList[messageID].classList.add("chat_GPT_style");
-      massageInsList[messageID].textContent += message;
+      massageInsList[messageID].innerHTML += message;
       chatbox.appendChild(massageInsList[messageID]);
   }
   chatbox.scrollTop = chatbox.scrollHeight;
@@ -104,10 +106,20 @@ socket.onmessage = function(event) {
 }
 
 // -------
+function escapeHtml(html) {
+  var text = document.createTextNode(html);
+  var p = document.createElement('p');
+  p.appendChild(text);
+  return p.innerHTML;
+}
 
-
-function proscenario(){
-  return;
+function proscenario(selected){
+  if (selected == "assistant") {
+    return "you are a helpful assistant";
+  }
+  if (selected == "Customer") {
+    return Customersennario.value.trim();
+  }
 }
 
 // 检测用户输入并输出
@@ -115,14 +127,14 @@ function prossceSend(){
   const message = input.value.trim();
   const inputTemperature = inputTemp.value.trim();
   const inputToken = inputTkn.value.trim();
-  const selected_scenario = inputSnr.value.trim();
+  const selected_scenario_from_user = inputSnr.value.trim();
   const Key = inputKey.value.trim();
   let inputmodel = "gpt-3.5-turbo";
   if (!Key) {
     alert("请输入密钥");
     return;
   }
-
+  selected_scenario = proscenario(selected_scenario_from_user);
   if (message) {
     const newMessage = document.createElement("div");
     newMessage.textContent = message;

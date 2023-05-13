@@ -15,6 +15,8 @@
             <div class="userprofile">
                 <input id="inputKey" type="text" placeholder="输入密钥">
                 <output id="token_remain">0</output>
+                    
+                
             </div>
 
             <div class="modlesetting">
@@ -28,23 +30,22 @@
                     <output id="temperatureOutput">1</output>
                     <input type="range" id="inputTemperature" min="0.1" max="1.5" step="0.1" value="1" oninput="temperatureOutput.value = inputTemperature.value">
                 </div>
-                <div>
+                <div class="sennario">
                     <select id="inputSnr">
                         <option value="assistant">assistant</option>
-                        <option value="translator">translator</option>
-                        <option value="catgirl">catgirl</option>
-                        <option value="teacher">teacher</option>
-                        <option value="mini_teacher">mini_teacher</option>
+                        <option value="Customer">customize</option>
                     </select>
+                    <textarea id="Customersennario" type="text" placeholder="输入设定"></textarea>
                 </div>
+                
             </div>
 
         </aside>
         <div class="chat">
             <div id="chatbox"></div>
             <div class="inputbox">
-                <textarea id="input" type="text" placeholder="输入消息并按回车"></textarea>
-                <button id="enter">enter</button>
+                <textarea id="input" type="text" placeholder=""></textarea>
+                <button id="enter">发送</button>
             </div>
         </div>
         <script src="chat.js"></script>
