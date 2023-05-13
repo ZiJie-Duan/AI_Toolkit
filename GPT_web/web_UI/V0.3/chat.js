@@ -1,4 +1,4 @@
-const socket = new WebSocket("ws://127.0.0.1:8080");
+const socket = new WebSocket("wss://www.jackymo.cn:14569");
 const inputTemp = document.getElementById("inputTemperature");
 const inputTkn = document.getElementById("inputToken");
 const inputSnr = document.getElementById("inputSnr");
@@ -7,7 +7,7 @@ const inputKey = document.getElementById("inputKey");
 // const selectElement = document.getElementById('mySelect');
 const chatbox = document.getElementById("chatbox");
 var input = document.getElementById("input");
-
+var token_remainELE = document.getElementById("token_remain");
 var enter = document.getElementById("enter")
 
 
@@ -62,6 +62,9 @@ socket.onclose = function(event) {
   console.log("Connection closed.", event);
 };
 
+socket.onerror = function(event) {
+  console.error("WebSocket error message:", event.message);
+};
 socket.onmessage = function(event) {
   const jsonData = JSON.parse(event.data);
   if ( jsonData["chatHistory"] != null) {
@@ -71,9 +74,13 @@ socket.onmessage = function(event) {
   messageSYS = jsonData["messageSYS"];
   messageID = jsonData["messageID"];
   state = jsonData["state"]
+  token_remain = jsonData["usage"]
   console.log("Received message from server: ", event.data);
   if (messageSYS != null) {
       alert(messageSYS)
+  }
+  if (token_remain != null){
+    token_remainELE.value = token_remain;
   }
   if (massageInsList[messageID]) {
       if (message == null) {
@@ -136,7 +143,7 @@ function prossceSend(){
     
 
     input.value = "";
-    chatbox.scrollTop = chat.scrollHeight;
+    chatbox.scrollTop = chatbox.scrollHeight;
   }
   }
 

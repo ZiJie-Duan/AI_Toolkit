@@ -197,17 +197,20 @@ class GPT_WebServer:
                 "messageSYS" : None,
                 "messageID" : feedback["details"]["event_id"],
                 "state" : "done",
-                'usage' : feedback["details"]["usage"]
+                'usage' : feedback["details"]["token_remain"]
             }
             await websocket.send(json.dumps(reply_user))
             
     def start(self):
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain('/www/GPT_python_v3/asjdaskdk/server.crt', '/www/GPT_python_v3/asjdaskdk/server.key')
-
+        ssl_context.load_cert_chain(certfile='//', keyfile='//')
+        
+        
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(websockets.serve(self.handler, "0.0.0.0", 8080))
+        loop.run_until_complete(websockets.serve(self.handler, "0.0.0.0", "::", ssl=ssl_context))
         loop.run_forever()
 
             
