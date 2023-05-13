@@ -166,7 +166,8 @@ class GPT_WebServer:
                 }
 
                 await websocket.send(json.dumps(reply_user))
-                break
+            
+                continue
                 
             stream = ai_generator()
             stenRecv = ""
