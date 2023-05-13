@@ -13,10 +13,13 @@ import functools
 import click
 import time
 
+CONFIG_FILE = "server_config.ini"
+
 class GPT_TCP_Server(TCPServer):
 
-    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
-        super().__init__(server_address, buffer_size)
+    def __init__(self, server_address=('localhost', 12345), 
+                 buffer_size=4096, ssl_files=('server.crt','server.key')):
+        super().__init__(server_address, buffer_size, ssl_files)
         self.data_process = None
         self.stream_feedback = None
 
@@ -46,7 +49,9 @@ class GPT_TCP_Server(TCPServer):
         
         print("[gpt_tcp_server]: 用户数据(debug)")
         pprint(user_data)
+
         # 处理数据 判断是否为流式数据
+        # 如果请求失败，则使用非流式传输错误反馈
         result_dict, stream = self.data_process(user_data)
         if stream:
             print("[gpt_tcp_server]: 允许流式数据传输\n")
@@ -84,18 +89,21 @@ class GPT_TCP_Server(TCPServer):
         #     if connection:
         #         connection.close()
 
-
 class GPT_Server():
     """
     a connection between GPT_API and TCP_Server
     """
     def __init__(self):
-        self.cfg = Config("server_config.ini")
+        self.cfg = Config(CONFIG_FILE)
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
         self.TCP_server = GPT_TCP_Server((self.cfg("SOCKET.host"), 
-                                     self.cfg("SOCKET.port")))
-        
-        self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+                                     self.cfg("SOCKET.port")),
+                        ssl_files=(self.cfg("SOCKET.cert_file"),
+                                   self.cfg("SOCKET.key_file")))
+
+        self.GPT_WebServer = GPT_WebServer(
+                ssl_files=(self.cfg("SOCKET.cert_file"),
+                            self.cfg("SOCKET.cert_file"))) 
         self.GPT_WebServer.data_process = self.data_process #使用回调函数的方式，导入我们的数据处理函数
         self.GPT_WebServer.stream_feedback = self.stream_feedback #以及流式数据处理函数
 
@@ -139,57 +147,8 @@ class GPT_Server():
         if data["model"] not in self.model_list:
             return True
         return False
-    
-    def stream_feedback(self, user_data: dict,
-                                   ai_reply: str,
-                                   details: dict) -> dict:
 
-        token_promote = self.token.get_token(user_data["model"],
-                             user_data["storyboard"],
-                             self.cfg("USERKEY.user_choice"))
-        token_complete = self.token.get_token(user_data["model"],
-                             [{"role":"assistant", "content":ai_reply}],
-                             self.cfg("USERKEY.user_choice"))
-        total_token_used = token_promote + token_complete
-        self.keymanager.decrease_value(user_data["user_key"], 
-                                        total_token_used)
-        reply = {"details":{}}
-        reply["details"]["event_id"] = user_data["event_id"]
-        reply["details"]["model"] = details["model"]
-        reply["details"]["usage"] = total_token_used
-        reply["details"]["finish_reason"] = details["choices"][0]["finish_reason"]
-        return reply
-
-    def data_process(self, data: dict) -> dict:
-        """
-        example data structure
-
-        data = {
-            "version_key" : "12kiw....",
-            "user_key" : "df3pt....",
-            "model" : "gpt-3.5-turbo",
-            "storyboard" : [{...},{...},...],
-            "temperature" : 1.5,
-            "max_tokens" : 200,
-            "event_id" : "12kiw....",
-            "stream" : "False"
-        }
-
-        reply = {
-            "state" : "success", 
-            # "success" or "user_key_error" or "version_key_error"
-            # "argument_error"
-            "message" : "None", # server feedback message
-            "reply" : "None",
-            "details" : {
-                "event_id" : "12kiw....",
-                "model" : "gpt-3.5-turbo",
-                'usage': "2330",
-                'finish_reason': 'stop',
-                } # API return detail
-        }
-        """
-        
+    def data_check(self, data: dict) -> dict:
         reply = {
             "state" : "None", 
             "message" : "None",
@@ -224,47 +183,88 @@ class GPT_Server():
             return reply, False
         
         else:
-            if data["stream"]:
-               
-                reply["state"] = "success"
-                reply["message"] = "success"
-                
-                ai_generator = functools.partial(
-                                self.gpt_api.query_stream,
-                                data["storyboard"],
-                                float(data["temperature"]),
-                                int(data["max_tokens"]),
-                                data["model"],
-                                full=True)
-                return reply, ai_generator
-            
-            else:
-            
-                ai_reply = self.gpt_api.query(data["storyboard"],
-                                        float(data["temperature"]),
-                                        int(data["max_tokens"]),
-                                        data["model"],
-                                        full=True)
-                
-                token_promote = self.token.get_token(data["model"],
-                            data["storyboard"],
-                            self.cfg("USERKEY.user_choice"))
-                token_complete = self.token.get_token(data["model"],
-                            [{"role":"assistant", "content":ai_reply}],
-                            self.cfg("USERKEY.user_choice"))
-                total_token_used = token_promote + token_complete
-                
-                reply["state"] = "success"
-                reply["message"] = "success"
-                reply["reply"] = ai_reply["choices"][0]["message"]["content"]
-                reply["details"]["event_id"] = data["event_id"]
-                reply["details"]["model"] = ai_reply["model"]
-                reply["details"]["usage"] = total_token_used
-                reply["details"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
+            reply["state"] = "success"
+            reply["message"] = "success"
+            return reply, True
 
-                self.keymanager.decrease_value(data["user_key"], 
-                                ai_reply["usage"]["total_tokens"])
-                return reply, False
+    
+    def stream_feedback(self, user_data: dict,
+                                   ai_reply: str,
+                                   details: dict) -> dict:
+
+        token_promote = self.token.get_token(user_data["model"],
+                             user_data["storyboard"],
+                             process="Prompt")
+        token_complete = self.token.get_token(user_data["model"],
+                             [{"role":"assistant", "content":ai_reply}],
+                             process="Completion")
+        
+        total_token_used = token_promote + token_complete
+        _, token_remain = self.keymanager.decrease_value(
+                                        user_data["user_key"], 
+                                        total_token_used)
+        reply = {"details":{}}
+        reply["details"]["event_id"] = user_data["event_id"]
+        reply["details"]["model"] = details["model"]
+        reply["details"]["token_remain"] = token_remain
+        reply["details"]["finish_reason"] = details["choices"][0]["finish_reason"]
+        return reply
+
+    def data_process(self, data: dict) -> dict:
+        """
+        data process function only has two return value
+        1. reply: dict
+        2. ai_generator: generator or False
+        ai_generator is used for stream transmission
+        False is used for normal transmission
+        """
+
+        reply, check = self.data_check(data)
+
+        if not check:
+            return reply, False
+        
+        if data["stream"]:
+            
+            reply["state"] = "success"
+            reply["message"] = "success"
+            
+            ai_generator = functools.partial(
+                            self.gpt_api.query_stream,
+                            data["storyboard"],
+                            float(data["temperature"]),
+                            int(data["max_tokens"]),
+                            data["model"],
+                            full=True)
+            return reply, ai_generator
+        
+        else:
+            ai_reply = self.gpt_api.query(data["storyboard"],
+                                    float(data["temperature"]),
+                                    int(data["max_tokens"]),
+                                    data["model"],
+                                    full=True)
+            
+            token_promote = self.token.get_token(data["model"],
+                        data["storyboard"])
+            
+            token_complete = self.token.get_token(data["model"],
+                    [{"role":"assistant", "content":ai_reply}])
+            
+            total_token_used = token_promote + token_complete
+            _, token_remain = self.keymanager.decrease_value(
+                            data["user_key"], 
+                            total_token_used)
+            
+            reply["state"] = "success"
+            reply["message"] = "success"
+            reply["reply"] = ai_reply["choices"][0]["message"]["content"]
+            reply["details"]["event_id"] = data["event_id"]
+            reply["details"]["model"] = ai_reply["model"]
+            reply["details"]["token_remain"] = token_remain
+            reply["details"]["finish_reason"] = ai_reply["choices"][0]["finish_reason"]
+
+            return reply, False
 
     def start(self):
         
@@ -333,3 +333,33 @@ cli.add_command(run)
 if __name__ == '__main__':
     #cli()
     run()
+
+
+
+
+# example data structure
+
+# data = {
+#     "version_key" : "12kiw....",
+#     "user_key" : "df3pt....",
+#     "model" : "gpt-3.5-turbo",
+#     "storyboard" : [{...},{...},...],
+#     "temperature" : 1.5,
+#     "max_tokens" : 200,
+#     "event_id" : "12kiw....",
+#     "stream" : "False"
+# }
+
+# reply = {
+#     "state" : "success", 
+#     # "success" or "user_key_error" or "version_key_error"
+#     # "argument_error"
+#     "message" : "None", # server feedback message
+#     "reply" : "None",
+#     "details" : {
+#         "event_id" : "12kiw....",
+#         "model" : "gpt-3.5-turbo",
+#         "token_remain": "2330",
+#         'finish_reason': 'stop',
+#         } # API return detail
+# }
