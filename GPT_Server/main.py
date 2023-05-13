@@ -13,10 +13,13 @@ import functools
 import click
 import time
 
+CONFIG_FILE = "server_config.ini"
+
 class GPT_TCP_Server(TCPServer):
 
-    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
-        super().__init__(server_address, buffer_size)
+    def __init__(self, server_address=('localhost', 12345), 
+                 buffer_size=4096, ssl_files=('server.crt','server.key')):
+        super().__init__(server_address, buffer_size, ssl_files)
         self.data_process = None
         self.stream_feedback = None
 
@@ -86,18 +89,21 @@ class GPT_TCP_Server(TCPServer):
         #     if connection:
         #         connection.close()
 
-
 class GPT_Server():
     """
     a connection between GPT_API and TCP_Server
     """
     def __init__(self):
-        self.cfg = Config("server_config.ini")
+        self.cfg = Config(CONFIG_FILE)
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
         self.TCP_server = GPT_TCP_Server((self.cfg("SOCKET.host"), 
-                                     self.cfg("SOCKET.port")))
-        
-        self.GPT_WebServer = GPT_WebServer() #实例化我们的 服务器类
+                                     self.cfg("SOCKET.port")),
+                        ssl_files=(self.cfg("SOCKET.cert_file"),
+                                   self.cfg("SOCKET.key_file")))
+
+        self.GPT_WebServer = GPT_WebServer(
+                ssl_files=(self.cfg("SOCKET.cert_file"),
+                            self.cfg("SOCKET.cert_file"))) 
         self.GPT_WebServer.data_process = self.data_process #使用回调函数的方式，导入我们的数据处理函数
         self.GPT_WebServer.stream_feedback = self.stream_feedback #以及流式数据处理函数
 

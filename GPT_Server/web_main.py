@@ -105,9 +105,10 @@ class Web_Client:
 
 class GPT_WebServer:
     
-    def __init__(self) -> None:
+    def __init__(self, ssl_files) -> None:
         self.data_process = None
         self.stream_feedback = None
+        self.ssl_files = ssl_files
 
     async def handler(self, websocket, path):
         async for message in websocket:
@@ -203,7 +204,8 @@ class GPT_WebServer:
             
     def start(self):
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(certfile='//', keyfile='//')
+        ssl_context.load_cert_chain(certfile = self.ssl_files[0], 
+                                    keyfile = self.ssl_files[1])
         
         
         ssl_context.verify_mode = ssl.CERT_NONE
