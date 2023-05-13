@@ -53,14 +53,14 @@ class CHAT_GUI(tk.Tk):
         self.model_combobox.pack(side=tk.TOP)
 
         # 添加Temperature标签和输入框
-        self.temperature_label = ttk.Label(self.left_frame, text="Temperature:")
+        self.temperature_label = ttk.Label(self.left_frame, text="灵活度(temperature):")
         self.temperature_label.pack(side=tk.TOP, pady=10)
         self.temperature_entry = ttk.Entry(self.left_frame)
         self.temperature_entry.pack(side=tk.TOP)
         self.temperature_entry.insert(0, self.temperature)  # 设置 temperature 默认值
 
         # 添加Max Tokens标签和输入框
-        self.max_tokens_label = ttk.Label(self.left_frame, text="Max Tokens:")
+        self.max_tokens_label = ttk.Label(self.left_frame, text="处理能力(max_tokens):")
         self.max_tokens_label.pack(side=tk.TOP, pady=10)
         self.max_tokens_entry = ttk.Entry(self.left_frame)
         self.max_tokens_entry.pack(side=tk.TOP)
@@ -80,12 +80,16 @@ class CHAT_GUI(tk.Tk):
         self.user_key_entry.pack(side=tk.TOP)
         self.user_key_entry.insert(0, self.user_key)  # 设置 user key 默认值
 
+        # 添加 user token remain 标签
+        self.user_token_label = ttk.Label(self.left_frame, text="Token 剩余: ")
+        self.user_token_label.pack(side=tk.TOP, pady=10)
+
         # 在左侧框架中添加设置
         self.setting_button = ttk.Button(self.left_frame, text="应用设置", command=self.settings)
         self.setting_button.pack(side=tk.TOP, pady=20)
 
         # 在左侧框架中添加
-        self.setting_button = ttk.Button(self.left_frame, text="刷新", command=self.refresh_dialogue)
+        self.setting_button = ttk.Button(self.left_frame, text="刷新对话", command=self.refresh_dialogue)
         self.setting_button.pack(side=tk.TOP, pady=10)
 
         # 添加对话计数器标签
@@ -157,6 +161,9 @@ class CHAT_GUI(tk.Tk):
     def update_dialogue_counter_text(self, new_text: str, color: str = "black"):
         self.dialogue_counter_lable.config(text=new_text,foreground=color)
 
+    def update_token_remain(self, token: int, color: str = "black"):
+        new_text = "Token 剩余: " + str(token)
+        self.user_token_label.config(text=new_text,foreground=color)
 
 # # 运行程序
 # if __name__ == "__main__":

@@ -296,8 +296,10 @@ class CHAT_CORE:
         self.chat_gui.insert_message("")
         event_id = reply["details"]["event_id"]
 
-        if "usage" in reply["details"]:
-            usage = reply["details"]["usage"]
+        if "token_remain" in reply["details"]:
+            usage = reply["details"]["token_remain"]
+            self.chat_gui.update_token_remain(usage)
+
         if "finish_reason" in reply["details"]:
             # if details donot have finish_reason
             # it means the event is abandoned
@@ -328,6 +330,7 @@ class CHAT_CORE:
             dialog = self.storyboard.prompt(promot,message,event_id,0)
 
         self.gpt_core.send_message(dialog,event_id)
+
 
     def settings(self, model: str, temperature: float, 
                  max_tokens: int, scenario: str, 
@@ -409,7 +412,7 @@ class CHAT_CORE:
         self.chat_gui.insert_message("[{}]: {}".format(role, info))
 
     def help(self):
-        self.print_info("欢迎使用 GPT_GUI_v2.1 Alpha", "系统")
+        self.print_info("欢迎使用 GPT_GUI_v2.3 Alpha", "系统")
         self.print_info("请遵循OpenAI使用条例", "系统")
         self.print_info(
         """
