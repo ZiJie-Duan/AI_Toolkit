@@ -4,7 +4,7 @@ from module.StoryBoard import Memo, StoryBoard
 from module.Config import Config
 from module.Exception_Handler import exception_handler
 from chat_gui import CHAT_GUI
-from pprint import pprint
+#from pprint import pprint
 import threading
 import uuid
 
@@ -277,10 +277,10 @@ class CHAT_CORE:
             self.print_info("参数错误, 请检查设置","系统")
  
     def stream_verify(self,reply):
-        print("stream_verify:")
-        pprint(reply)
+        # print("stream_verify:")
+        # pprint(reply)
         if reply["state"] == "success":
-            self.chat_gui.insert_message(self.cfg("prompt.selected_scenario")+": ",False)
+            self.chat_gui.insert_message(self.cfg("PROMPT.selected_scenario")+": ",False)
             return True
         else:
             self.info_analyze(reply["state"])
@@ -291,7 +291,7 @@ class CHAT_CORE:
         self.message_temp += text
 
     def stream_end(self,reply,full_reply):
-        pprint(reply)
+        # pprint(reply)
 
         self.chat_gui.insert_message("")
         event_id = reply["details"]["event_id"]
@@ -321,11 +321,11 @@ class CHAT_CORE:
             return
 
         self.chat_gui.insert_message("\n用户: " + message)
-        if self.cfg("prompt.selected_scenario") == "assistant":
+        if self.cfg("PROMPT.selected_scenario") == "assistant":
             promot = "you are a helpful assistant"
             dialog = self.storyboard.prompt(promot,message,event_id,0)
 
-        if self.cfg("prompt.selected_scenario") == "teacher":
+        if self.cfg("PROMPT.selected_scenario") == "teacher":
             promot = "you are a teacher"
             dialog = self.storyboard.prompt(promot,message,event_id,0)
 
@@ -339,24 +339,24 @@ class CHAT_CORE:
         set the temperature, max_tokens and scenario
         return True if the settings are valid
         """
-        # scenario_chanege = False
-        # if self.cfg("prompt.selected_scenario") != scenario:
-        #     scenario_chanege = True
+        scenario_chanege = False
+        if self.cfg("PROMPT.selected_scenario") != scenario:
+            scenario_chanege = True
 
-        # if temperature < self.cfg("GPT.min_temperature")\
-        #     or temperature > self.cfg("GPT.max_temperature"):
-        #     self.print_info("温度值错误, 请重新设置", "系统")
-        #     return False
+        if temperature < self.cfg("GPT.min_temperature")\
+            or temperature > self.cfg("GPT.max_temperature"):
+            self.print_info("温度值错误, 请重新设置", "系统")
+            return False
         
-        # if max_tokens < self.cfg("GPT.min_tokens")\
-        #     or max_tokens > self.cfg("GPT.max_tokens"):
-        #     self.print_info("Max_Tokens数错误, 请重新设置", "系统")
-        #     return False
+        if max_tokens < self.cfg("GPT.min_tokens")\
+            or max_tokens > self.cfg("GPT.max_tokens"):
+            self.print_info("Max_Tokens数错误, 请重新设置", "系统")
+            return False
         
         self.cfg.set("GPT","model",model)
         self.cfg.set("GPT","temperature",temperature)
         self.cfg.set("GPT","tokens",max_tokens)
-        self.cfg.set("prompt","selected_scenario",scenario)
+        self.cfg.set("PROMPT","selected_scenario",scenario)
         self.cfg.set("SOCKET","user_key",user_key)
 
         self.set_gpt_arguments()
@@ -374,7 +374,7 @@ class CHAT_CORE:
         if num_of_dialogue\
               >= self.cfg("SOTRYBOARD.max_dialogue")\
                     - num_of_dialogue:
-            info = "对话次数已达推荐上限 \n您可以继续进行对话 \n但为了程序稳定 \n推荐您尽快结束对话 \n并点击重启对话按钮"
+            info = "对话次数已达推荐上限 \n您可以继续进行对话 \n但为了节约Token用量 \n推荐您尽快结束对话 \n并点击重启对话按钮"
             self.chat_gui.update_dialogue_counter_text(info, color="red")
         else:
             info = "建议对话次数 剩余：" \
@@ -406,7 +406,7 @@ class CHAT_CORE:
                 self.chat_gui.insert_message("[系统]: " + message["content"])
             else:
                 self.chat_gui.insert_message(
-            self.cfg("prompt.selected_scenario")+": "+message["content"])
+            self.cfg("PROMPT.selected_scenario")+": "+message["content"])
 
     def print_info(self, info: str, role: str) -> None:
         self.chat_gui.insert_message("[{}]: {}".format(role, info))
@@ -426,30 +426,32 @@ class CHAT_CORE:
 
 信息安全: 在分享或公开API的结果时,确保不泄露您的API密钥或包含敏感信息的请求。
         """, "系统")
-        self.print_info("此程序将对话记录存储至软件根目录下的memo.json文件", "系统")
-        self.print_info("使用方法：", "系统")
-        self.print_info("'Temperature', 'Max_Tokens' 修改后需要点击设置进行保存", "系统")
-        self.print_info("'情景选择' 修改后将自动 '重启对话' 进行应用", "系统")
-        self.print_info("'刷新' 将去除所有的系统提示, 仅保留对话信息", "系统")
-        self.print_info("'重启对话' 将清空对话记录, 并重新开始对话", "系统")
-        self.print_info("'Temperature' 范围 0.1 - 2.0 ", "系统警告")
-        self.print_info("'Max_Tokens' 范围 10 - 2000 ", "系统警告")
-    
+        self.print_info("此程序将对话记录存储至软件根目录下的memo.json文件\n", "系统")
+        self.print_info("使用方法:", "系统")
+        self.print_info("1. 设置用户秘钥", "系统")
+        self.print_info("2. 设置开始对话\n", "系统")
+
+        self.print_info("灵活度(temperature) 范围: 0.0 - 2.0", "系统")
+        self.print_info("处理能力(max_tokens) 范围: 10 - 4000\n", "系统")
+        self.print_info("请注意! 对话记录越长, Token用量越多", "系统")
+        self.print_info("请注意! GPT4的Token用量是GPT3.5的30倍", "系统")
+        self.print_info("请注意! 请您注意GPT4的对话次数, 防止浪费Token", "系统")
+
 def main():
 
-    #try:
-    chat_core = CHAT_CORE()
-    chat_core.help()
-    chat_core.chat_gui.mainloop()
-    # except Exception as e:
-    #     try:
-    #         chat_core.print_info("错误信息: " + str(e), "系统错误")
-    #         chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
-    #     except:
-    #         pass
-    #     print(e)
-    #     print("程序出现错误, 请联系开发者")
-    # return 0
+    try:
+        chat_core = CHAT_CORE()
+        chat_core.help()
+        chat_core.chat_gui.mainloop()
+    except Exception as e:
+        try:
+            chat_core.print_info("错误信息: " + str(e), "系统错误")
+            chat_core.print_info("程序出现错误, 请联系开发者", "系统错误")
+        except:
+            pass
+        print(e)
+        print("程序出现错误, 请联系开发者")
+    return 0
         
 if __name__ == "__main__":
     main()

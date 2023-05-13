@@ -3,7 +3,8 @@ import json
 import ssl
 
 class TCPServer:
-    def __init__(self, server_address=('localhost', 12345), buffer_size=4096):
+    def __init__(self, server_address = ('localhost', 12345), 
+                 buffer_size = 4096, ssl_files = ('server.crt','server.key')):
         self.server_address = server_address
         self.buffer_size = buffer_size
         self.stream_end = "/<<--END-->>/"
@@ -15,7 +16,8 @@ class TCPServer:
 
          # 加载证书和私钥
         self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.context.load_cert_chain(certfile='server.crt', keyfile='server.key')
+        self.context.load_cert_chain(certfile = ssl_files[0], 
+                                     keyfile = ssl_files[1])
 
 
     def recv_all(self, sock: object, data_len: bytes) -> bytes:

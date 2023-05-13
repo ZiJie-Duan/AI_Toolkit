@@ -105,9 +105,11 @@ class Web_Client:
 
 class GPT_WebServer:
     
-    def __init__(self, ssl_files) -> None:
+    def __init__(self, server_address = ('localhost', 12345), 
+                 ssl_files = ('server.crt','server.key')) -> None:
         self.data_process = None
         self.stream_feedback = None
+        self.server_address = server_address
         self.ssl_files = ssl_files
 
     async def handler(self, websocket, path):
@@ -213,7 +215,11 @@ class GPT_WebServer:
         
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(websockets.serve(self.handler, "0.0.0.0", "::", ssl=ssl_context))
+        loop.run_until_complete(
+            websockets.serve(self.handler, 
+                             self.server_address[0],
+                             self.server_address[1], 
+                             ssl=ssl_context))
         loop.run_forever()
 
             

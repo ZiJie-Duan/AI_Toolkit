@@ -1,6 +1,7 @@
 import configparser
 from typing import Any
 from module.Exception_Handler import exception_handler
+import os
 
 class Config:
 
@@ -14,6 +15,10 @@ class Config:
 
     @exception_handler
     def read(self, path):
+        # 读取配置文件
+        # 判断文件是否存在
+        if not os.path.exists(path):
+            raise FileNotFoundError(f'文件不存在: {path}')
         self.config.read(path, encoding='utf-8')
 
     @exception_handler

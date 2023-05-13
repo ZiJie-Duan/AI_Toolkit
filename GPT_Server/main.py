@@ -1,4 +1,3 @@
-
 from module.GPT_API import GPT_API
 from module.Config import Config
 from module.TCP_Server import TCPServer
@@ -6,13 +5,14 @@ from module.Key_Manager import KeyManager
 from module.token_tool import TokenCounter
 from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
 from threading import Thread
+from uuid import uuid4
 import socket
 import ssl
 from pprint import pprint
-import functools
-import click
-import time
+from functools import partial
+from time import sleep
 
+#CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
 CONFIG_FILE = "server_config.ini"
 
 class GPT_TCP_Server(TCPServer):
@@ -94,7 +94,7 @@ class GPT_Server():
     a connection between GPT_API and TCP_Server
     """
     def __init__(self):
-        self.cfg = Config(CONFIG_FILE)
+        self.cfg = Config(path = CONFIG_FILE)
         self.gpt_api = GPT_API(self.cfg("GPT.api_key"))
         self.TCP_server = GPT_TCP_Server((self.cfg("SOCKET.host"), 
                                      self.cfg("SOCKET.port")),
@@ -102,8 +102,11 @@ class GPT_Server():
                                    self.cfg("SOCKET.key_file")))
 
         self.GPT_WebServer = GPT_WebServer(
-                ssl_files=(self.cfg("SOCKET.cert_file"),
-                            self.cfg("SOCKET.cert_file"))) 
+                ssl_files=(self.cfg("WEB.cert_file"),
+                            self.cfg("WEB.key_file")),
+                server_address=(self.cfg("WEB.host"),
+                                self.cfg("WEB.port")))
+        
         self.GPT_WebServer.data_process = self.data_process #使用回调函数的方式，导入我们的数据处理函数
         self.GPT_WebServer.stream_feedback = self.stream_feedback #以及流式数据处理函数
 
@@ -229,7 +232,7 @@ class GPT_Server():
             reply["state"] = "success"
             reply["message"] = "success"
             
-            ai_generator = functools.partial(
+            ai_generator = partial(
                             self.gpt_api.query_stream,
                             data["storyboard"],
                             float(data["temperature"]),
@@ -280,60 +283,18 @@ class GPT_Server():
         web_server.join()
     
 
-@click.group()
-def cli():
-    pass
-
-@click.command(help='run gpt server')
-def run():
+def main():
     print("[main] 初始化服务器...")
     server = GPT_Server()
     while True:
         print("[main] 进入服务器主循环...\n")
         server.start()
-        time.sleep(3)
+        sleep(3)
         print("[main] 重启服务器...\n")
     
 
-@click.command(help='key manager')
-@click.option('--add', '-a', help='add a new key', is_flag=True)
-@click.option('--delete', '-d', help='delete a key', is_flag=True)
-@click.option('--ls', '-l', help='list all keys', is_flag=True)
-@click.argument('key', type=str, required=False) # n is None
-@click.argument('value', type=int, required=False)
-def key(add, delete, ls, key=None, value=2000):
-    cfg = Config()
-    keymanager = KeyManager(cfg("USERKEY.file_path"))
-    if add:
-        if key == 'n':
-            key = None
-        keymanager.add_key_value(key=key, value=value)
-        print("add key-value")
-        print(key, value)
-    elif delete:
-        if key is None or key == 'n':
-            print("Please enter the correct arguments")
-            return
-        keymanager.remove_key(key)
-        print("delete key")
-        print(key)
-    elif ls:
-        print("list all keys\n")
-        kv = keymanager.get_all_keys_value()
-        print("-"*50)
-        for k, v in kv:
-            print(f"{k:<40s} : {v:<10d}")
-        print("-"*50)
-    else:
-        print("Please enter the correct command")
-
-cli.add_command(key)
-cli.add_command(run)
-
 if __name__ == '__main__':
-    #cli()
-    run()
-
+    main()
 
 
 

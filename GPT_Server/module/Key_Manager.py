@@ -1,4 +1,4 @@
-import uuid
+from uuid import uuid4
 import json
 import threading
 
@@ -23,7 +23,7 @@ class KeyManager:
     def add_key_value(self, key=None, value=0.0):
         with self.lock:
             if not key:
-                key = str(uuid.uuid4())
+                key = str(uuid4())
             self.key_value_map[key] = value
             self._save_data()
         return key
