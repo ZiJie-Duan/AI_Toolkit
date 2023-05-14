@@ -5,15 +5,15 @@ from module.Key_Manager import KeyManager
 from module.token_tool import TokenCounter
 from web_main import GPT_WebServer # 导入我们的web_main.py，GPT_WebServer类是我们和主程序衔接的接口
 from threading import Thread
-from uuid import uuid4
 import socket
 import ssl
 from pprint import pprint
 from functools import partial
 from time import sleep
+import datetime
 
-#CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
-CONFIG_FILE = "server_config.ini"
+CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
+#CONFIG_FILE = "server_config.ini"
 
 class GPT_TCP_Server(TCPServer):
 
@@ -44,7 +44,8 @@ class GPT_TCP_Server(TCPServer):
         # try:
         connection = self.context.wrap_socket(orig_connection, server_side=True)
 
-        print('[gpt_tcp_server]: 连接来自', client_address)
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('[gpt_tcp_server]: {} 连接来自 {}'.format(current_time, client_address))
         user_data = self.esay_recv(connection)
         
         print("[gpt_tcp_server]: 用户数据(debug)")

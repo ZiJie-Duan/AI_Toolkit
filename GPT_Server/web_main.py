@@ -3,7 +3,6 @@ import websockets
 import asyncio
 import ssl
 import threading
-from module.Config import Config
 from module.StoryBoard import Memo, StoryBoard
 from module.TCP_Client import TCPClient
 from module.GPT_API import GPT_API
@@ -114,7 +113,6 @@ class GPT_WebServer:
 
     async def handler(self, websocket, path):
         async for message in websocket:
-            cfg = Config()
 
             reply = {}
             data = json.loads(message)
