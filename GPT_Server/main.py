@@ -12,8 +12,8 @@ from functools import partial
 from time import sleep
 import datetime
 
-CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
-#CONFIG_FILE = "server_config.ini"
+#CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
+CONFIG_FILE = "server_config.ini"
 
 class GPT_TCP_Server(TCPServer):
 

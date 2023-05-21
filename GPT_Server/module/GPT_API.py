@@ -19,7 +19,7 @@ class GPT_API:
             model = self.model
 
         response = openai.ChatCompletion.create(
-                model = self.model,
+                model = model,
                 messages = messages,
                 temperature = temperature,
                 max_tokens = max_tokens
@@ -36,12 +36,12 @@ class GPT_API:
             max_tokens = 100,
             model = None,
             full = False) -> str:
-        
+
         if not model:
             model = self.model
         
         response = openai.ChatCompletion.create(
-            model = self.model,
+            model = model,
             messages = messages,
             temperature = temperature,
             max_tokens = max_tokens,

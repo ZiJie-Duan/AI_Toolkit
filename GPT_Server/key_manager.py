@@ -9,6 +9,7 @@ CONFIG_FILE = "server_config.ini"
 
 @click.option('--add', '-a', help='add a new key', is_flag=True)
 @click.option('--delete', '-d', help='delete a key', is_flag=True)
+@click.option('--change', '-c', help='change value of key', is_flag=True)
 @click.option('--ls', '-l', help='list all keys', is_flag=True)
 @click.argument('key', type=str, required=False) # n is None
 @click.argument('value', type=int, required=False)
