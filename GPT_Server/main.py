@@ -12,6 +12,7 @@ from functools import partial
 from time import sleep
 import datetime
 
+# this is a test
 #CONFIG_FILE = "/www/GPT_python_v3/server_config.ini"
 CONFIG_FILE = "server_config.ini"
 
