@@ -22,8 +22,8 @@ def query_mouse_position():
     return pt.x, pt.y
 
 def press_ctrl_c():
-    keyboard.press('ctrl+c')
-    keyboard.release('ctrl+c')
+    keyboard.press('ctrl+alt+b')
+    keyboard.release('ctrl+alt+b')
 
 def translate_text(text,set,tcp_client,story_board):
 
@@ -65,46 +65,51 @@ def main():
             if e.keysym == 'Escape':
                 close_window(window)
 
-        print("快捷键触发")
+            try: 
+                print("快捷键触发")
 
-        press_ctrl_c()
+                press_ctrl_c()
 
-        time.sleep(0.1)
+                time.sleep(0.1)
 
-        # 从剪切板读取选中的文本
-        selected_text = pyperclip.paste()
-        print("选中文本：", selected_text)
+                # 从剪切板读取选中的文本
+                selected_text = pyperclip.paste()
+                print("选中文本：", selected_text)
 
-        winsound.MessageBeep()
+                winsound.MessageBeep()
 
-        # 如果剪切板为空或只有空格，不执行翻译
-        if not selected_text.strip():
-            print("没有选中任何文本")
-            return
+                # 如果剪切板为空或只有空格，不执行翻译
+                if not selected_text.strip():
+                    print("没有选中任何文本")
+                    return
 
-        # 翻译文本
-        translated_text = translate_text(selected_text,set,tcp_client,storyboard)
-        print("AI翻译：", translated_text)
-        mouse_x, mouse_y = query_mouse_position()
+                # 翻译文本
+                translated_text = translate_text(selected_text,set,tcp_client,storyboard)
+                print("AI翻译：", translated_text)
+                mouse_x, mouse_y = query_mouse_position()
 
-        pyperclip.copy(translated_text)
+                pyperclip.copy(translated_text)
 
-        window = tk.Tk()
-        window.title("AI翻译")
-        window.attributes('-topmost', True)  # 保持窗口在最前端
-        window.bind('<KeyRelease>', on_key_release)
-        
-        label = ttk.Label(window, text=translated_text, wraplength=380, justify="left")
-        label.pack(padx=20, pady=20)
-        button = ttk.Button(window, text="关闭", command=lambda: close_window(window))
-        button.pack(pady=10)
+                window = tk.Tk()
+                window.title("AI翻译")
+                window.attributes('-topmost', True)  # 保持窗口在最前端
+                window.bind('<KeyRelease>', on_key_release)
+                
+                label = ttk.Label(window, text=translated_text, wraplength=380, justify="left")
+                label.pack(padx=20, pady=20)
+                button = ttk.Button(window, text="关闭", command=lambda: close_window(window))
+                button.pack(pady=10)
 
-        window.update_idletasks()
-        window_width = window.winfo_width()
-        window_height = window.winfo_height()
+                window.update_idletasks()
+                window_width = window.winfo_width()
+                window_height = window.winfo_height()
 
-        window.geometry(f"{window_width}x{window_height}+{mouse_x + 10}+{mouse_y - window_height // 2}")
-        window.mainloop()
+                window.geometry(f"{window_width}x{window_height}+{mouse_x + 10}+{mouse_y - window_height // 2}")
+                window.mainloop()
+                
+            except Exception as e:
+                print("翻译失败：", e)
+                return
 
     while True:
         # 等待特定快捷键，例如 'ctrl+alt+t'
