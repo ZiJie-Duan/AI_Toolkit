@@ -10,7 +10,10 @@ def remove_pycache(directory):
                 shutil.rmtree(pycache_path)
 
 if __name__ == "__main__":
-    directory = input("请输入要搜索的目录路径: ")
+    # get current directory
+    directory = os.getcwd()
     remove_pycache(directory)
     print("完成删除所有__pycache__文件夹及其子文件。")
     input("按任意键退出。")
+
+
